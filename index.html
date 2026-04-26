@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Stone">
+  <meta name="theme-color" content="#ffffff">
+  <title>Stone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:       #111827;
+      --green:       #1A4731;
+      --mint:        #D1FAE5;
+      --amber:       #D97706;
+      --amber-light: #FEF3C7;
+      --red:         #DC2626;
+      --red-light:   #FEE2E2;
+      --white:       #FFFFFF;
+      --gray-50:     #F9FAFB;
+      --gray-100:    #F3F4F6;
+      --gray-200:    #E5E7EB;
+      --gray-400:    #9CA3AF;
+      --gray-500:    #6B7280;
+      --gray-700:    #374151;
+      --purple-light:#EDE9FE;
+      --purple:      #7C3AED;
+      --font-sans:   'DM Sans', system-ui, sans-serif;
+      --font-serif:  'DM Serif Display', Georgia, serif;
+    }
+
+    html, body { height: 100%; overflow: hidden; background: var(--white); font-family: var(--font-sans); color: var(--black); -webkit-font-smoothing: antialiased; }
+
+    #app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; position: relative; }
+
+    .status-bar { height: env(safe-area-inset-top, 44px); min-height: 20px; flex-shrink: 0; }
+
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 24px 12px; flex-shrink: 0; }
+
+    .wordmark { font-family: var(--font-sans); font-size: 20px; font-weight: 800; color: var(--black); letter-spacing: -0.02em; }
+
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    .tab-bar { display: flex; align-items: center; gap: 8px; padding: 0 24px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0; }
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab-pill { background: var(--gray-100); color: var(--gray-500); font-family: var(--font-sans); font-size: 14px; font-weight: 500; padding: 8px 18px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap; transition: background 0.15s, color 0.15s; -webkit-tap-highlight-color: transparent; }
+    .tab-pill.active { background: var(--black); color: var(--white); font-weight: 600; }
+
+    .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(88px + env(safe-area-inset-bottom, 20px)); }
+
+    .mic-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 24px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px)); background: var(--white); border-top: 1px solid var(--gray-100); }
+    .mic-inner { display: flex; align-items: center; gap: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 14px; padding: 14px 16px; }
+    .mic-text { flex: 1; font-family: var(--font-sans); font-size: 14px; color: var(--black); border: none; background: transparent; outline: none; }
+    .mic-text::placeholder { color: var(--gray-400); }
+    .mic-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--green); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; -webkit-tap-highlight-color: transparent; }
+    .mic-btn.listening { background: var(--red); }
+
+    .section-label { font-family: var(--font-sans); font-size: 11px; font-weight: 700; color: var(--gray-400); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+
+    .mode-badge { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .mode-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .mode-label { font-family: var(--font-sans); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .mode-headline { font-family: var(--font-serif); font-size: 28px; font-weight: 400; color: var(--black); line-height: 34px; }
+
+    .badge { font-family: var(--font-sans); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+    .badge-green  { background: var(--mint);        color: var(--green);  }
+    .badge-amber  { background: var(--amber-light); color: var(--amber);  }
+    .badge-red    { background: var(--red-light);   color: var(--red);    }
+    .badge-gray   { background: var(--gray-100);    color: var(--gray-500); }
+    .badge-dark   { background: var(--black);       color: var(--white);  }
+    .badge-purple { background: var(--purple-light);color: var(--purple); }
+
+    .contact-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-sans); font-size: 13px; font-weight: 700; }
+    .avatar-sm      { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-sans); font-size: 13px; font-weight: 700; }
+    .av-green { background: var(--mint);      color: var(--green);   }
+    .av-red   { background: var(--red-light); color: var(--red);     }
+    .av-gray  { background: var(--gray-100);  color: var(--gray-700);}
+
+    .mask-grid { display: flex; gap: 8px; padding: 0 24px 20px; }
+    .mask-card { flex: 1; background: var(--gray-50); border-radius: 10px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .mask-letter { font-family: var(--font-sans); font-size: 16px; font-weight: 800; color: var(--black); }
+    .mask-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .mask-sub { font-family: var(--font-sans); font-size: 9px; font-weight: 600; color: var(--gray-400); text-align: center; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    .intention-card { margin: 0 24px 20px; background: var(--mint); border-radius: 12px; padding: 16px 18px; }
+    .intention-label { font-family: var(--font-sans); font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+    .intention-text { font-family: var(--font-serif); font-style: italic; font-size: 15px; color: var(--green); line-height: 22px; }
+
+    .fitness-strip { display: flex; align-items: center; gap: 10px; margin: 0 24px 20px; padding: 12px 14px; background: var(--gray-50); border-radius: 10px; border: 1px solid var(--gray-200); }
+
+    .next-up-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--gray-100); gap: 10px; }
+    .next-up-item:last-child { border-bottom: none; }
+
+    .focus-block { margin: 0 24px 20px; background: var(--black); border-radius: 16px; padding: 24px; }
+    .countdown { font-family: var(--font-serif); font-size: 48px; color: var(--white); line-height: 1; margin-bottom: 4px; }
+    .countdown-label { font-family: var(--font-sans); font-size: 12px; color: var(--gray-400); margin-bottom: 20px; }
+    .focus-priority { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; }
+    .fp-label { font-family: var(--font-sans); font-size: 10px; font-weight: 700; color: var(--gray-400); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+    .fp-text { font-family: var(--font-sans); font-size: 16px; font-weight: 600; color: var(--white); }
+
+    .progress-card { margin: 0 24px 20px; background: var(--amber-light); border-radius: 12px; padding: 16px 18px; }
+    .progress-track { background: rgba(217,119,6,0.2); border-radius: 999px; height: 6px; margin: 10px 0 8px; }
+    .progress-fill { background: var(--amber); border-radius: 999px; height: 6px; }
+
+    .day-score-card { margin: 0 24px 20px; background: var(--black); border-radius: 16px; padding: 20px 24px; }
+    .day-score-num { font-family: var(--font-serif); font-size: 56px; color: var(--white); line-height: 1; }
+
+    .reflection-card { background: var(--gray-50); border-radius: 10px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+    .refl-label { font-family: var(--font-sans); font-size: 13px; font-weight: 700; flex-shrink: 0; padding-top: 1px; width: 30px; }
+    .refl-text { font-family: var(--font-sans); font-size: 13px; color: var(--gray-700); line-height: 18px; }
+
+    .wrap-cta { display: flex; align-items: center; justify-content: space-between; background: var(--black); border-radius: 14px; padding: 18px 24px; cursor: pointer; }
+    .wrap-cta-title { font-family: var(--font-sans); font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+    .wrap-cta-sub { font-family: var(--font-sans); font-size: 13px; color: var(--gray-500); }
+    .wrap-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    .schedule-row { display: flex; align-items: stretch; min-height: 44px; }
+    .sched-time { width: 72px; flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; color: var(--gray-400); padding-top: 2px; }
+    .sched-time.now { color: var(--green); font-weight: 600; }
+    .sched-bar { width: 3px; background: var(--gray-200); border-radius: 999px; flex-shrink: 0; margin-right: 14px; }
+    .sched-bar.done { background: var(--mint); }
+    .sched-bar.now  { background: var(--green); }
+    .sched-content { flex: 1; padding: 2px 0 14px; }
+    .sched-title { font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--black); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sched-title.dim { color: var(--gray-700); }
+    .sched-sub { font-family: var(--font-sans); font-size: 12px; color: var(--gray-500); }
+    .sched-sub.dim { color: var(--gray-400); }
+    .now-badge { background: var(--mint); color: var(--green); font-family: var(--font-sans); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.04em; }
+
+    .tenx-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .checkbox { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--gray-200); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .checkbox.pri  { border-color: var(--green); }
+    .checkbox.done { background: var(--green); border-color: var(--green); }
+    .tenx-label { flex: 1; font-family: var(--font-sans); font-size: 14px; color: var(--black); }
+    .tenx-label.done { color: var(--gray-400); text-decoration: line-through; }
+
+    .contact-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-info { flex: 1; min-width: 0; }
+    .contact-name { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: var(--black); }
+    .contact-role { font-family: var(--font-sans); font-size: 12px; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .contact-time { font-family: var(--font-sans); font-size: 11px; color: var(--gray-400); }
+
+    .msg-preview { background: var(--gray-50); border-radius: 8px; padding: 10px 12px; font-family: var(--font-sans); font-size: 13px; color: var(--gray-700); line-height: 18px; margin-top: 8px; }
+    .msg-preview.drafting { color: var(--gray-400); font-style: italic; }
+    .send-btn { background: var(--green); color: var(--white); font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: none; cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+    .send-btn.draft { background: var(--gray-100); color: var(--gray-500); }
+
+    .project-card { border: 1px solid var(--gray-200); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .proj-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .proj-name { font-family: var(--font-sans); font-size: 15px; font-weight: 700; color: var(--black); }
+    .proj-sub  { font-family: var(--font-sans); font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .proj-next { font-family: var(--font-sans); font-size: 13px; color: var(--gray-700); }
+    .proj-next-label { font-weight: 600; color: var(--gray-400); }
+    .proj-next-label.blocked { color: var(--red); }
+    .pri-h { background: var(--black);     color: var(--white);    }
+    .pri-m { background: var(--gray-200);  color: var(--gray-700); }
+    .pri-l { background: var(--gray-100);  color: var(--gray-400); }
+
+    .log-entry { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .log-time { font-family: var(--font-sans); font-size: 12px; color: var(--gray-400); flex-shrink: 0; padding-top: 1px; width: 36px; }
+    .log-text { font-family: var(--font-sans); font-size: 14px; color: var(--gray-700); line-height: 20px; }
+
+    .faith-anchor { font-family: var(--font-serif); font-style: italic; font-size: 16px; color: var(--green); line-height: 24px; padding: 0 24px 20px; border-bottom: 1px solid var(--gray-100); }
+
+    .section { padding: 20px 24px; }
+    .section + .section { border-top: 1px solid var(--gray-100); }
+
+    .tmrw-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .tmrw-num  { font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: var(--gray-400); width: 16px; flex-shrink: 0; }
+    .tmrw-text { font-family: var(--font-sans); font-size: 14px; color: var(--black); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="status-bar"></div>
+  <div class="header">
+    <span class="wordmark">Stone</span>
+    <div class="avatar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="12" cy="7" r="4" stroke="white" stroke-width="2"/>
+      </svg>
+    </div>
+  </div>
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-pill active" data-tab="home">Home</button>
+    <button class="tab-pill" data-tab="day">Day</button>
+    <button class="tab-pill" data-tab="people">People</button>
+    <button class="tab-pill" data-tab="projects">Projects</button>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="mic-bar">
+    <div class="mic-inner">
+      <input class="mic-text" id="mic-input" type="text" placeholder="Narrate your progress...">
+      <button class="mic-btn" id="mic-btn">
+        <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+          <rect x="4" y="1" width="6" height="10" rx="3" fill="white"/>
+          <path d="M1 9C1 12.3137 3.68629 15 7 15C10.3137 15 13 12.3137 13 9" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="7" y1="15" x2="7" y2="17" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const data = {
+  faithAnchor: '"Ask, and it shall be given you; seek, and ye shall find." — Matt. 7:7',
+  schedule: [
+    { time: '5–8 AM',   label: 'Gym window',               sub: 'Smallest effort keeps the streak',       status: 'done'     },
+    { time: '7–8:15',  label: 'Priming + Spiritual study', sub: 'Tony Robbins → Manifestations → Prayer', status: 'done'     },
+    { time: '9–11 AM', label: 'Peak Flow — Job search',    sub: '90-min deep work — 10x only',            status: 'now'      },
+    { time: '11:30–2', label: 'Rebuild — Calls + Meetings',sub: 'Jason Richards call · 12:00 PM',         status: 'upcoming' },
+    { time: '2–6 PM',  label: 'Execute — Outreach + Comms',sub: '3 sends queued',                         status: 'upcoming' },
+  ],
+  tenX: [
+    { label: 'Priming + Manifestations',           type: 'Mind', done: true,  pri: false },
+    { label: 'Job search deep work — cover letter', type: 'Mind', done: false, pri: true  },
+    { label: 'Call with Jason Richards',            type: 'Rel',  done: false, pri: false },
+    { label: 'Musicologie strategy review',         type: 'Mind', done: false, pri: false },
+    { label: "Present at Young Men's tonight",      type: 'Pres', done: false, pri: false },
+  ],
+  log: [
+    { time: '7:12', entry: 'Priming done. Feeling sharp.' },
+    { time: '7:48', entry: 'Spiritual study + prayer complete.' },
+    { time: '9:03', entry: 'In peak flow. Starting cover letter for Lumen.' },
+  ],
+  mask: [
+    { letter: 'M', label: 'Mindset',   status: 'done',    detail: 'Priming done'  },
+    { letter: 'A', label: 'Action',    status: 'active',  detail: '2 of 5 done'   },
+    { letter: 'S', label: 'Spirit',    status: 'done',    detail: 'Study done'    },
+    { letter: 'K', label: 'Kindness',  status: 'pending', detail: "YM's tonight"  },
+  ],
+  contacts: [
+    { initials:'JR', name:'Jason Richards', role:'Board advisor', action:'Call today',           status:'overdue', time:'2 days ago', av:'av-red'   },
+    { initials:'MC', name:'Maria Chen',     role:'CEO',           action:'Warm intro pending',   status:'overdue', time:'4 days ago', av:'av-red'   },
+    { initials:'SM', name:'Sarah Mitchell', role:'CPO',           action:'LinkedIn msg ready',   status:'send',    time:'Today',      av:'av-green' },
+    { initials:'TK', name:'Tom Kreiger',    role:'VP Eng',        action:'Warm intro via David', status:'draft',   time:'This week',  av:'av-gray'  },
+    { initials:'DP', name:'David Park',     role:'Partner',       action:'Connector — knows Tom',status:'active',  time:'3 days ago', av:'av-gray'  },
+    { initials:'LN', name:'Lisa Nguyen',    role:'Recruiter',     action:'Response pending',     status:'waiting', time:'Yesterday',  av:'av-gray'  },
+  ],
+  outreach: [
+    { initials:'JR', name:'Jason Richards', role:'Board advisor', action:'Follow-up call',     msg:'"Hey Jason — wanted to follow up on our last call. Would love 20 min this week."', status:'send',  av:'av-green' },
+    { initials:'SM', name:'Sarah Mitchell', role:'CPO',           action:'LinkedIn connect',   msg:'"Sarah — your work on product-led growth at Carta caught my eye. Would love to connect."', status:'send', av:'av-gray' },
+    { initials:'TK', name:'Tom Kreiger',    role:'VP Eng',        action:'Warm intro via David',msg:'Stone is drafting this message...', status:'draft', av:'av-gray' },
+  ],
+  projects: [
+    { name:'Job Search',          sub:'Active outreach · 3 prospects', status:'active',  pri:'H', next:'Send cover letter for Lumen CPO role',        blocked:false },
+    { name:'Musicologie Lindon',  sub:'Pre-opening · 87 founders',     status:'active',  pri:'H', next:"Review weekly KPIs + Julie's action plan",     blocked:false },
+    { name:'KAIROS',              sub:'v0.4.1 live · AI product',      status:'slow',    pri:'M', next:'Ship dashboard mobile view',                    blocked:false },
+    { name:'Rödhakens Bo Office', sub:'Leasehold improvements',        status:'blocked', pri:'M', next:'SBA decision pending',                          blocked:true  },
+    { name:'Twins Mission Prep',  sub:'PMG study plan · Active',       status:'active',  pri:'H', next:'Primary Temple Recommend — May 3 deadline',     blocked:false },
+  ],
+  wrap: {
+    score: 83,
+    stats: [
+      { dot:'#D1FAE5', text:'4 of 6 10x done',    color:'#D1FAE5' },
+      { dot:'#FCD34D', text:'3 outreach sent',     color:'#FCD34D' },
+      { dot:'#6B7280', text:'2 moved to tomorrow', color:'#9CA3AF' },
+    ],
+    reflection: [
+      { label:'Win',  border:'#D1FAE5', lc:'#1A4731', text:'Sent 3 warm outreach messages and booked a call with Jason.' },
+      { label:'Gap',  border:'#FCD34D', lc:'#D97706', text:'Cover letter update moved to tomorrow — lost 45 min to low-leverage admin.' },
+      { label:'Next', border:'#E5E7EB', lc:'#6B7280', text:"Stone is staging tomorrow's brief now. Check in the morning." },
+    ],
+    tomorrow: [
+      'Cover letter — Lumen CPO role',
+      'Tom Kreiger outreach — warm intro',
+      'Musicologie founder count check-in',
+    ],
+  },
+};
+
+/* ---- ENERGY MODE ---- */
+function getMode() {
+  const t = new Date().getHours() + new Date().getMinutes() / 60;
+  if (t >= 5  && t < 9)   return 'prime';
+  if (t >= 9  && t < 11)  return 'peak';
+  if (t >= 11.5 && t < 14) return 'rebuild';
+  if (t >= 14 && t < 18)  return 'execute';
+  return 'wrap';
+}
+
+const modeCfg = {
+  prime:   { dot:'#1A4731', color:'#1A4731', label:'PRIME MODE · 5–9AM',        headline:'Ground. Intend. Begin.'       },
+  peak:    { dot:'#1A4731', color:'#1A4731', label:'PEAK MODE · 9–11AM',         headline:'Lock in. Go deep.'            },
+  rebuild: { dot:'#D97706', color:'#D97706', label:'REBUILD MODE · 11:30AM–2PM', headline:'Recharge. Connect. Prepare.'  },
+  execute: { dot:'#1A4731', color:'#1A4731', label:'EXECUTE MODE · 2–6PM',       headline:'Send. Follow up. Close.'      },
+  wrap:    { dot:'#6B7280', color:'#6B7280', label:'WRAP MODE · EVENING',        headline:'Reflect. Reset. Rest.'        },
+};
+
+function modeHero(mode) {
+  const c = modeCfg[mode];
+  return `<div style="padding:0 24px 16px;">
+    <div class="mode-badge">
+      <div class="mode-dot" style="background:${c.dot}"></div>
+      <span class="mode-label" style="color:${c.color}">${c.label}</span>
+    </div>
+    <div class="mode-headline">${c.headline}</div>
+  </div>`;
+}
+
+/* ---- HELPERS ---- */
+const checkSVG = () => `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const arrowSVG = () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function typeBadge(type) {
+  const m = { Mind:'badge-green', Rel:'badge-amber', Pres:'badge-purple' };
+  return `<span class="badge ${m[type]||'badge-gray'}">${type}</span>`;
+}
+
+function statusBadge(s) {
+  const m = { active:['badge-green','Active'], slow:['badge-amber','Slow'], blocked:['badge-red','Blocked'], overdue:['badge-red','Overdue'], send:['badge-green','Send'], draft:['badge-amber','Draft'], waiting:['badge-gray','Waiting'], active:['badge-green','Active'] };
+  const [cls,label] = m[s]||['badge-gray',s];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+/* ---- HOME VIEWS ---- */
+function renderPrime() {
+  const maskCards = data.mask.map(m => {
+    const dot = m.status==='done' ? '#1A4731' : m.status==='active' ? '#D97706' : '#D1D5DB';
+    return `<div class="mask-card"><span class="mask-letter">${m.letter}</span><div class="mask-dot" style="background:${dot}"></div><span class="mask-sub">${m.detail}</span></div>`;
+  }).join('');
+
+  const nextItems = data.tenX.filter(t=>!t.done).slice(0,3).map(t =>
+    `<div class="next-up-item"><span style="font-family:var(--font-sans);font-size:14px;color:var(--black);flex:1;">${t.label}</span>${typeBadge(t.type)}</div>`
+  ).join('');
+
+  return `${modeHero('prime')}
+    <div class="mask-grid">${maskCards}</div>
+    <div class="intention-card">
+      <div class="intention-label">Today's Intention</div>
+      <div class="intention-text">I will execute with focus and lead with faith.</div>
+    </div>
+    <div class="fitness-strip">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" stroke="#1A4731" stroke-width="2" stroke-linecap="round"/></svg>
+      <div style="flex:1;"><span style="font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--black);">Gym window</span><span style="font-family:var(--font-sans);font-size:12px;color:var(--gray-500);margin-left:8px;">5–8 AM</span></div>
+      <span class="badge badge-green">Streak on</span>
+    </div>
+    <div style="padding:0 24px 20px;"><div class="section-label">Next Up</div>${nextItems}</div>`;
+}
+
+function getPeakTime() {
+  const now = new Date(), end = new Date(now);
+  end.setHours(11,0,0,0);
+  const d = Math.max(0, end - now);
+  const h = Math.floor(d/3600000), m = Math.floor((d%3600000)/60000), s = Math.floor((d%60000)/1000);
+  return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function renderPeak() {
+  const top = data.tenX.find(t=>!t.done&&t.pri) || data.tenX.find(t=>!t.done);
+  const rows = data.tenX.map(t =>
+    `<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?checkSVG():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`
+  ).join('');
+  return `${modeHero('peak')}
+    <div class="focus-block">
+      <div class="countdown" id="countdown">${getPeakTime()}</div>
+      <div class="countdown-label">remaining in peak window</div>
+      <div class="focus-priority"><div class="fp-label">Top Priority</div><div class="fp-text">${top?top.label:'All 10x done'}</div></div>
+    </div>
+    <div style="padding:0 24px 20px;"><div class="section-label">10x Items</div>${rows}</div>`;
+}
+
+function renderRebuild() {
+  const done = data.tenX.filter(t=>t.done).length, total = data.tenX.length, pct = Math.round(done/total*100);
+  const contacts = data.contacts.filter(c=>c.status==='overdue'||c.status==='send').slice(0,3).map(c =>
+    `<div class="contact-row"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}</div></div>`
+  ).join('');
+  return `${modeHero('rebuild')}
+    <div class="progress-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><span class="section-label" style="color:#D97706;margin:0;">Day Progress</span><span style="font-family:var(--font-sans);font-size:13px;font-weight:700;color:#D97706;">${done} of ${total} done</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <span style="font-family:var(--font-sans);font-size:12px;color:#D97706;">Deep work done · Cover narrative complete</span>
+    </div>
+    <div style="padding:0 24px 20px;"><div class="section-label">Who to Reach</div>${contacts}</div>`;
+}
+
+function renderExecute() {
+  const queue = data.outreach.map((c,i) => {
+    const border = i < data.outreach.length-1 ? 'padding-bottom:16px;border-bottom:1px solid var(--gray-100);margin-bottom:16px;' : '';
+    return `<div style="${border}">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="avatar-sm ${c.av}">${c.initials}</div>
+        <div style="flex:1;"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div>
+        <button class="send-btn ${c.status==='draft'?'draft':''}">${c.status==='draft'?'Draft':'Send'}</button>
+      </div>
+      <div class="msg-preview ${c.status==='draft'?'drafting':''}">${c.msg}</div>
+    </div>`;
+  }).join('');
+
+  const hits = data.tenX.filter(t=>!t.done).slice(0,3).map(t =>
+    `<div class="tenx-row"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`
+  ).join('');
+
+  return `${modeHero('execute')}
+    <div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${queue}</div>
+    <div style="padding:16px 24px 8px;border-top:1px solid var(--gray-100);"><div class="section-label">Quick Hits</div>${hits}</div>`;
+}
+
+function renderWrap() {
+  const w = data.wrap;
+  const stats = w.stats.map(s => `<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-family:var(--font-sans);font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');
+  const refl  = w.reflection.map(r => `<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');
+  const tmrw  = w.tomorrow.map((t,i) => `<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');
+  return `${modeHero('wrap')}
+    <div class="day-score-card">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;">
+        <div><div class="section-label" style="color:var(--gray-400);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--gray-500);">%</span></div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint);border-radius:999px;height:6px;width:${w.score}%;"></div></div>
+    </div>
+    <div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div>
+    <div style="padding:0 24px 20px;border-top:1px solid var(--gray-100);"><div class="section-label">Tomorrow's Top 3</div>${tmrw}</div>
+    <div style="padding:0 24px 20px;"><div class="wrap-cta"><div><div class="wrap-cta-title">Run End-of-Day Wrap</div><div class="wrap-cta-sub">Stone stages tomorrow's brief</div></div><div class="wrap-icon">${arrowSVG()}</div></div></div>`;
+}
+
+/* ---- TAB RENDERS ---- */
+function renderDay() {
+  const sched = data.schedule.map(s => `
+    <div class="schedule-row">
+      <div class="sched-time ${s.status==='now'?'now':''}">${s.time}</div>
+      <div class="sched-bar ${s.status==='upcoming'?'':s.status}"></div>
+      <div class="sched-content">
+        <div class="sched-title ${s.status==='upcoming'?'dim':''}">${s.label}${s.status==='now'?'<span class="now-badge">NOW</span>':''}</div>
+        <div class="sched-sub ${s.status==='upcoming'?'dim':''}">${s.sub}</div>
+      </div>
+    </div>`).join('');
+
+  const tenx = data.tenX.map(t =>
+    `<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?checkSVG():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`
+  ).join('');
+
+  const log = data.log.map(l => `<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-text">${l.entry}</span></div>`).join('');
+
+  return `<div class="faith-anchor">${data.faithAnchor}</div>
+    <div class="section"><div class="section-label">Schedule</div>${sched}</div>
+    <div class="section"><div class="section-label">10x Items</div>${tenx}</div>
+    <div class="section"><div class="section-label">Log</div>${log}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;opacity:0.5;">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--gray-200);"></div>
+        <span style="font-family:var(--font-sans);font-size:13px;color:var(--gray-400);font-style:italic;">Narrate to add an entry...</span>
+      </div>
+    </div>`;
+}
+
+function renderPeople() {
+  const overdue  = data.contacts.filter(c=>c.status==='overdue');
+  const priority = data.contacts.filter(c=>c.status!=='overdue');
+  const row = c => `<div class="contact-row">
+    <div class="contact-avatar ${c.av}">${c.initials}</div>
+    <div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div>
+    <div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div>
+  </div>`;
+  return `<div style="padding:0 24px 16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-family:var(--font-serif);font-size:22px;color:var(--black);line-height:28px;">Network</div><div style="font-family:var(--font-sans);font-size:13px;color:var(--gray-500);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div>
+      <button style="background:var(--green);color:white;font-family:var(--font-sans);font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;-webkit-tap-highlight-color:transparent;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add
+      </button>
+    </div>
+  </div>
+  <div style="padding:0 24px;">
+    <div class="section-label" style="color:var(--red);">Overdue</div>${overdue.map(row).join('')}
+    <div class="section-label" style="margin-top:18px;">Priority</div>${priority.map(row).join('')}
+  </div>`;
+}
+
+function renderProjects() {
+  const cards = data.projects.map(p => {
+    const pc = p.pri==='H'?'pri-h':p.pri==='M'?'pri-m':'pri-l';
+    return `<div class="project-card">
+      <div class="proj-header">
+        <div><div class="proj-name">${p.name}</div><div class="proj-sub">${p.sub}</div></div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${statusBadge(p.status)}<span class="badge ${pc}">${p.pri}</span></div>
+      </div>
+      <div class="proj-next"><span class="proj-next-label ${p.blocked?'blocked':''}">${p.blocked?'Blocked':'Next'} → </span>${p.next}</div>
+    </div>`;
+  }).join('');
+  const activeCount  = data.projects.filter(p=>p.status==='active').length;
+  const blockedCount = data.projects.filter(p=>p.status==='blocked').length;
+  return `<div style="padding:0 24px 16px;">
+    <div style="font-family:var(--font-serif);font-size:22px;color:var(--black);line-height:28px;">Projects</div>
+    <div style="font-family:var(--font-sans);font-size:13px;color:var(--gray-500);margin-top:2px;">${activeCount} active · ${blockedCount} blocked</div>
+  </div>
+  <div style="padding:0 24px;">${cards}</div>`;
+}
+
+/* ---- ROUTING ---- */
+let activeTab = 'home';
+let countdownTimer = null;
+
+function render(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-pill').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+  clearInterval(countdownTimer);
+  let html = '';
+  if (tab==='home') {
+    const mode = getMode();
+    if (mode==='prime')   html = renderPrime();
+    else if (mode==='peak')    { html = renderPeak(); countdownTimer = setInterval(()=>{ const el=document.getElementById('countdown'); if(el) el.textContent=getPeakTime(); else clearInterval(countdownTimer); },1000); }
+    else if (mode==='rebuild') html = renderRebuild();
+    else if (mode==='execute') html = renderExecute();
+    else                       html = renderWrap();
+  } else if (tab==='day')      html = renderDay();
+  else if (tab==='people')     html = renderPeople();
+  else if (tab==='projects')   html = renderProjects();
+  const content = document.getElementById('content');
+  content.innerHTML = html;
+  content.scrollTop = 0;
+}
+
+document.getElementById('tab-bar').addEventListener('click', e => {
+  const pill = e.target.closest('.tab-pill');
+  if (pill) render(pill.dataset.tab);
+});
+
+/* ---- NARRATION ---- */
+const micInput = document.getElementById('mic-input');
+const micBtn   = document.getElementById('mic-btn');
+let SR = null, listening = false;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  SR = new SRClass();
+  SR.continuous = false;
+  SR.interimResults = false;
+  SR.lang = 'en-US';
+  SR.onresult = e => { micInput.value = e.results[0][0].transcript; };
+  SR.onend = () => { listening=false; micBtn.classList.remove('listening'); if(micInput.value.trim()) submitLog(); };
+}
+
+micBtn.addEventListener('click', () => {
+  if (!SR) return;
+  if (!listening) { listening=true; micBtn.classList.add('listening'); SR.start(); }
+  else            { SR.stop(); }
+});
+
+micInput.addEventListener('keydown', e => { if(e.key==='Enter' && micInput.value.trim()) submitLog(); });
+
+function submitLog() {
+  const text = micInput.value.trim();
+  if (!text) return;
+  const now = new Date();
+  const t = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  data.log.push({ time:t, entry:text });
+  micInput.value = '';
+  if (activeTab==='home'||activeTab==='day') render(activeTab);
+}
+
+render('home');
+</script>
+</body>
+</html>
