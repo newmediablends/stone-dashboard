@@ -706,7 +706,7 @@ async function navigateDay(delta) {
   data = JSON.parse(JSON.stringify(sample));
   updateDateNav();
   const dateStr = formatDate(currentDate);
-  if (activeRootDir) {
+  if (activeRootDir && !isLocalServer) {
     await loadRealData(activeRootDir, dateStr);
   } else {
     await fetchFromGitHub(dateStr);
@@ -749,10 +749,23 @@ function submitLog(){const text=micInput.value.trim();if(!text)return;const now=
 
 /* ---- INIT ---- */
 const hasFileAccess = typeof window.showDirectoryPicker === 'function';
+const isLocalServer = ['localhost','127.0.0.1'].includes(location.hostname)
+  || location.hostname.endsWith('.local')
+  || /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
 
 async function init() {
+  if (isLocalServer) {
+    // Running from local server — fetch live files directly, no connect step
+    showAppShell();
+    const note = document.getElementById('connected-note');
+    note.style.display = 'block';
+    note.textContent = 'Live · reading from Second Brain';
+    await fetchFromGitHub(formatDate(currentDate));
+    render('home');
+    return;
+  }
   if (!hasFileAccess) {
-    // iOS Safari / Firefox — fetch synced markdown files from GitHub Pages
+    // iOS Safari on GitHub Pages — fetch synced markdown files
     showAppShell();
     await fetchFromGitHub(formatDate(currentDate));
     render('home');
