@@ -1,67 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#1E5C3A"/>
-      <stop offset="100%" stop-color="#0F2E1D"/>
+      <stop offset="100%" stop-color="#0C2818"/>
+    </linearGradient>
+    <radialGradient id="stone" cx="36%" cy="30%" r="65%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="40%"  stop-color="#D1FAE5"/>
+      <stop offset="100%" stop-color="#6EE7B7"/>
     </radialGradient>
-    <radialGradient id="stone" cx="38%" cy="32%" r="60%">
-      <stop offset="0%" stop-color="#F0FDF8"/>
-      <stop offset="45%" stop-color="#C6F0DC"/>
-      <stop offset="100%" stop-color="#86EFAC"/>
-    </radialGradient>
-    <filter id="drop" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#051A0D" flood-opacity="0.55"/>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur"/>
+      <feFlood flood-color="#4ADE80" flood-opacity="0.35" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="inner" x="0%" y="0%" width="100%" height="100%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur"/>
-      <feOffset dx="0" dy="-4" result="offset"/>
-      <feComposite in="SourceGraphic" in2="offset" operator="over"/>
+    <filter id="inner-shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+      <feOffset dx="4" dy="8" result="offset"/>
+      <feFlood flood-color="#0C2818" flood-opacity="0.4" result="color"/>
+      <feComposite in="color" in2="offset" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <clipPath id="round">
-      <rect width="512" height="512" rx="115"/>
-    </clipPath>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+  <!-- Background: rounded square, iOS icon shape -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
 
-  <!-- Subtle grid texture on background -->
-  <rect width="512" height="512" rx="115" fill="none"
-        stroke="#1A4731" stroke-width="1" opacity="0.2"/>
+  <!-- Subtle texture lines -->
+  <rect width="512" height="512" rx="112" fill="none" stroke="#2D7A4A" stroke-width="1.5" opacity="0.4"/>
 
-  <!-- Stone body — smooth irregular oval/boulder -->
-  <g filter="url(#drop)">
-    <path d="
-      M258 96
-      C296 90  348 107 385 140
-      C428 178 440 236 430 292
-      C420 350 382 396 325 416
-      C268 436 198 426 155 390
-      C108 350  90 290 100 232
-      C110 176 148 130 196 110
-      C220 100 240 97 258 96 Z
-    " fill="url(#stone)"/>
-  </g>
+  <!-- Stone body: smooth asymmetric river-stone shape -->
+  <path filter="url(#glow)"
+    d="M 255 88
+       C 308 80  370 105 402 152
+       C 436 202 436 268 415 318
+       C 393 370 344 406 285 418
+       C 224 430 158 412 120 366
+       C 80  318  80  248  104 196
+       C 128 142  176 106  220 92
+       C 232 88   244 86   255 88 Z"
+    fill="url(#stone)"
+    filter="url(#inner-shadow)"/>
 
-  <!-- Highlight streak — top-left catch light -->
-  <path d="M 175 162 C 200 148 232 143 258 150"
-        stroke="white" stroke-width="11" stroke-linecap="round"
-        fill="none" opacity="0.65"/>
+  <!-- Primary highlight — top-left gloss -->
+  <ellipse cx="196" cy="168" rx="52" ry="22"
+    fill="white" opacity="0.55"
+    transform="rotate(-32 196 168)"/>
 
-  <!-- Secondary micro-highlight -->
-  <path d="M 168 195 C 178 188 192 185 205 187"
-        stroke="white" stroke-width="6" stroke-linecap="round"
-        fill="none" opacity="0.3"/>
+  <!-- Secondary micro-gloss -->
+  <ellipse cx="174" cy="210" rx="22" ry="9"
+    fill="white" opacity="0.25"
+    transform="rotate(-28 174 210)"/>
 
-  <!-- Stone edge — subtle rim shadow to give depth -->
-  <path d="
-    M258 96
-    C296 90  348 107 385 140
-    C428 178 440 236 430 292
-    C420 350 382 396 325 416
-    C268 436 198 426 155 390
-    C108 350  90 290 100 232
-    C110 176 148 130 196 110
-    C220 100 240 97 258 96 Z
-  " fill="none" stroke="#4ADE80" stroke-width="2" opacity="0.25"/>
+  <!-- Stone edge rim — subtle depth -->
+  <path
+    d="M 255 88
+       C 308 80  370 105 402 152
+       C 436 202 436 268 415 318
+       C 393 370 344 406 285 418
+       C 224 430 158 412 120 366
+       C 80  318  80  248  104 196
+       C 128 142  176 106  220 92
+       C 232 88   244 86   255 88 Z"
+    fill="none" stroke="#A7F3D0" stroke-width="2" opacity="0.3"/>
 </svg>

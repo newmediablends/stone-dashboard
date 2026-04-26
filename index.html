@@ -8,8 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="Stone">
   <title>Stone</title>
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
   <link rel="shortcut icon" href="icon.svg">
+  <meta name="theme-color" content="#0C2818">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
@@ -387,16 +388,29 @@ const sample = {
 let data = JSON.parse(JSON.stringify(sample));
 
 /* ---- FILE PARSERS ---- */
+function section(md, ...headings) {
+  // Extract a section by any of the provided headings, stopping at the next ##
+  for (const h of headings) {
+    const re = new RegExp(`##\\s+${h.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}[\\s\\S]+?(?=\\n##|$)`);
+    const m = md.match(re);
+    if (m) return m[0];
+  }
+  return '';
+}
+
 function parseDailyNote(md) {
   const out = {};
 
-  const anchor = md.match(/\*\*Faith anchor:\*\*[\s\S]*?>\s*(.+)/);
-  if (anchor) out.faithAnchor = anchor[1].trim();
+  // Faith anchor — labeled format OR bare blockquote at top of doc
+  const labeled = md.match(/\*\*Faith anchor:\*\*[\s\S]*?>\s*"?([^"\n]+)"?/);
+  const bare    = md.match(/^>\s*"?([^"\n]+)"?\s*—/m);
+  const raw     = labeled || bare;
+  if (raw) out.faithAnchor = '"' + raw[1].trim().replace(/^"|"$/g,'') + '"';
 
-  const sec1 = md.match(/## Section 1[\s\S]+?(?=##|$)/)?.[0] || '';
-  const schedRows = [...sec1.matchAll(/\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|/g)].slice(2);
+  // Schedule — handles ## Section 1 or ## Schedule
+  const sec1 = section(md, 'Section 1[^#\n]*', 'Schedule');
+  const schedRows = [...sec1.matchAll(/\|\s*([^|\n\-]{2,}?)\s*\|\s*([^|\n\-]{2,}?)\s*\|\s*([^|\n\-]{2,}?)\s*\|/g)].slice(2);
   if (schedRows.length) {
-    const now = new Date().getHours() + new Date().getMinutes()/60;
     out.schedule = schedRows.map(r => ({
       time:  r[1].trim(),
       label: r[2].trim(),
@@ -405,37 +419,44 @@ function parseDailyNote(md) {
     }));
   }
 
-  const sec2 = md.match(/## Section 2[\s\S]+?(?=##|$)/)?.[0] || '';
-  const tenxRows = [...sec2.matchAll(/\|\s*\d+\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|[^|\n]*\|[^|\n]*\|\s*\[([x ])\]/gi)];
+  // 10x Items — handles ## Section 2 or ## 10x Items
+  const sec2 = section(md, 'Section 2[^#\n]*', '10x Items');
+  // Match rows starting with a number or ⚠️, with at least 3 pipe-separated cells
+  const tenxRows = [...sec2.matchAll(/\|\s*(?:\d+|⚠️)[^\|]*\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|[^|\n]*\|[^|\n]*\|\s*(\[[ x]\]|✅|)?\s*\|?/gi)]
+    .filter(r => r[1] && !r[1].includes('---') && !r[1].toLowerCase().includes('item'));
   if (tenxRows.length) {
-    out.tenX = tenxRows.map((r,i) => ({
+    out.tenX = tenxRows.map((r, i) => ({
       label: r[1].trim(),
-      type:  r[2].trim().split('/')[0].trim().substring(0,4),
-      done:  r[3].toLowerCase() === 'x',
-      pri:   i === 0 ? false : !tenxRows[0][3],
+      type:  r[2].trim().split(/[\/,]/)[0].trim().substring(0, 4),
+      done:  /x|✅/i.test(r[3] || ''),
+      pri:   false,
     }));
-    if (out.tenX.length > 0) out.tenX[0].pri = false;
-    const firstOpen = out.tenX.find(t=>!t.done);
+    const firstOpen = out.tenX.find(t => !t.done);
     if (firstOpen) firstOpen.pri = true;
   }
 
-  const quickMatch = md.match(/\*\*Quick Hits\*\*\s*\n((?:\n?-[^\n]+)+)/);
-  if (quickMatch) {
-    out.quickHits = quickMatch[1].trim().split('\n')
-      .filter(l => l.trim().startsWith('-'))
-      .map(l => {
-        const text = l.replace(/^-\s+/,'').trim();
-        return { label: text.replace(/^\(Stone\)\s*/,''), stone: text.startsWith('(Stone)'), done: false };
+  // Quick Hits — handles **Quick Hits** bold or ## Quick Hits heading
+  const qhSection = section(md, 'Quick Hits');
+  const qhBold    = md.match(/\*\*Quick Hits\*\*\s*\n((?:\n?-[^\n]+)+)/);
+  const qhSrc     = qhSection || (qhBold ? qhBold[0] : '');
+  if (qhSrc) {
+    const lines = [...qhSrc.matchAll(/^-\s+(.+)$/gm)];
+    if (lines.length) {
+      out.quickHits = lines.map(l => {
+        const text = l[1].trim();
+        return { label: text.replace(/^\(Stone\)\s*/, ''), stone: text.startsWith('(Stone)'), done: false };
       });
+    }
   }
 
-  const sec3 = md.match(/## Section 3[\s\S]*/)?.[0] || '';
-  const logEntries = [...sec3.matchAll(/^-\s+(\d{1,2}:\d{2})\s*[-–]\s*(.+)$/gm)];
-  if (logEntries.length) {
-    out.log = logEntries.map(m => ({ time: m[1], entry: m[2].trim() }));
+  // Log — handles ## Section 3 or ## Log
+  const logSec = section(md, 'Section 3[^#\n]*', 'Log');
+  const timestamped = [...logSec.matchAll(/^-\s+(\d{1,2}:\d{2})\s*[-–]\s*(.+)$/gm)];
+  if (timestamped.length) {
+    out.log = timestamped.map(m => ({ time: m[1], entry: m[2].trim() }));
   } else {
-    const anyLog = [...sec3.matchAll(/^-\s+(.+)$/gm)].filter(m => !m[1].startsWith('#'));
-    if (anyLog.length) out.log = anyLog.slice(0,8).map(m => ({ time:'—', entry: m[1].trim() }));
+    const plain = [...logSec.matchAll(/^-\s+(.+)$/gm)].filter(m => !/^#|----|^>/.test(m[1]));
+    if (plain.length) out.log = plain.slice(0, 10).map(m => ({ time: '—', entry: m[1].trim() }));
   }
 
   return out;
