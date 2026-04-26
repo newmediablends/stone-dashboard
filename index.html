@@ -104,7 +104,7 @@
 
     .mic-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 24px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px)); background: var(--bg); border-top: 1px solid var(--border-light); }
     .mic-inner { display: flex; align-items: center; gap: 12px; background: var(--bg-surface); border: 1px solid var(--mic-border); border-radius: 14px; padding: 14px 16px; }
-    .mic-text { flex: 1; font-size: 14px; color: var(--text); border: none; background: transparent; outline: none; font-family: inherit; }
+    .mic-text { flex: 1; font-size: 16px; color: var(--text); border: none; background: transparent; outline: none; font-family: inherit; }
     .mic-text::placeholder { color: var(--text-4); }
     .mic-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--green-btn); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; -webkit-tap-highlight-color: transparent; }
     .mic-btn.listening { background: var(--red); }
@@ -118,14 +118,14 @@
     .connect-note { font-size: 12px; color: var(--text-4); }
 
     /* ---- SHARED COMPONENTS ---- */
-    .section-label { font-size: 11px; font-weight: 700; color: var(--text-4); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+    .section-label { font-size: 12px; font-weight: 700; color: var(--text-4); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
 
     .mode-badge { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .mode-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .mode-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .mode-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
     .mode-headline { font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; color: var(--text); line-height: 34px; }
 
-    .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+    .badge { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
     .bg-green   { background: var(--mint-bg);    color: var(--mint-text);   }
     .bg-amber   { background: var(--amber-bg);   color: var(--amber-text);  }
     .bg-red     { background: var(--red-bg);     color: var(--red-text);    }
@@ -143,7 +143,7 @@
     .mask-card { flex: 1; background: var(--bg-surface); border-radius: 10px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .mask-letter { font-size: 16px; font-weight: 800; color: var(--text); }
     .mask-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .mask-sub { font-size: 9px; font-weight: 600; color: var(--text-4); text-align: center; text-transform: uppercase; letter-spacing: 0.04em; }
+    .mask-sub { font-size: 11px; font-weight: 600; color: var(--text-4); text-align: center; text-transform: uppercase; letter-spacing: 0.04em; }
 
     .intention-card { margin: 0 24px 20px; background: var(--mint-bg); border-radius: 12px; padding: 16px 18px; }
     .intention-label { font-size: 10px; font-weight: 700; color: var(--mint-text); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
@@ -178,7 +178,7 @@
     .wrap-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--green-btn); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
     .schedule-row { display: flex; align-items: stretch; min-height: 44px; }
-    .sched-time { width: 72px; flex-shrink: 0; font-size: 12px; color: var(--text-4); padding-top: 2px; }
+    .sched-time { width: 72px; flex-shrink: 0; font-size: 13px; color: var(--text-4); padding-top: 2px; }
     .sched-time.now { color: var(--mint-text); font-weight: 600; }
     .sched-bar { width: 3px; background: var(--border); border-radius: 999px; flex-shrink: 0; margin-right: 14px; }
     .sched-bar.done { background: var(--mint-bg); }
@@ -186,7 +186,7 @@
     .sched-content { flex: 1; padding: 2px 0 14px; }
     .sched-title { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .sched-title.dim { color: var(--text-2); }
-    .sched-sub { font-size: 12px; color: var(--text-3); }
+    .sched-sub { font-size: 13px; color: var(--text-3); }
     .sched-sub.dim { color: var(--text-4); }
     .now-badge { background: var(--mint-bg); color: var(--mint-text); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.04em; }
 
@@ -201,9 +201,9 @@
     .contact-row:last-child { border-bottom: none; }
     .contact-info { flex: 1; min-width: 0; }
     .contact-name { font-size: 15px; font-weight: 600; color: var(--text); }
-    .contact-role { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-role { font-size: 13px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
     .contact-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-    .contact-time { font-size: 11px; color: var(--text-4); }
+    .contact-time { font-size: 12px; color: var(--text-4); }
 
     .msg-preview { background: var(--bg-surface); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text-2); line-height: 18px; margin-top: 8px; }
     .msg-preview.drafting { color: var(--text-4); font-style: italic; }
@@ -222,8 +222,8 @@
     .pri-l { background: var(--bg-surface); color: var(--text-4); }
 
     .log-entry { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
-    .log-time { font-size: 12px; color: var(--text-4); flex-shrink: 0; padding-top: 1px; width: 36px; }
-    .log-text { font-size: 14px; color: var(--text-2); line-height: 20px; }
+    .log-time { font-size: 13px; color: var(--text-4); flex-shrink: 0; padding-top: 1px; width: 40px; }
+    .log-text { font-size: 15px; color: var(--text-2); line-height: 22px; }
 
     .faith-anchor { font-family: 'DM Serif Display', Georgia, serif; font-style: italic; font-size: 16px; color: var(--mint-text); line-height: 24px; padding: 0 24px 20px; border-bottom: 1px solid var(--border-light); }
 
@@ -389,9 +389,9 @@ let data = JSON.parse(JSON.stringify(sample));
 
 /* ---- FILE PARSERS ---- */
 function section(md, ...headings) {
-  // Extract a section by any of the provided headings, stopping at the next ##
+  // headings are treated as regex patterns (no escaping)
   for (const h of headings) {
-    const re = new RegExp(`##\\s+${h.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}[\\s\\S]+?(?=\\n##|$)`);
+    const re = new RegExp(`##\\s+${h}[\\s\\S]+?(?=\\n##|$)`);
     const m = md.match(re);
     if (m) return m[0];
   }
@@ -447,6 +447,28 @@ function parseDailyNote(md) {
         return { label: text.replace(/^\(Stone\)\s*/, ''), stone: text.startsWith('(Stone)'), done: false };
       });
     }
+  }
+
+  // Network Top 5 — from daily note table
+  const netSec = section(md, 'Network[^#\n]*Top 5', 'Network — Top 5', 'Network Top 5', 'Network');
+  const netRows = [...netSec.matchAll(/\|\s*([^|\-\n]{3,40}?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]*?)\s*\|/g)]
+    .slice(2)
+    .filter(r => r[1] && !r[1].includes('---') && !r[1].toLowerCase().includes('contact'));
+  if (netRows.length) {
+    out.contacts = netRows.map(r => {
+      const name   = r[1].trim();
+      const status = r[2].trim().toLowerCase();
+      const action = r[3].trim();
+      const due    = r[4]?.trim() || '';
+      const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+      const isOverdue = /overdue|now/i.test(status + due);
+      const av     = isOverdue ? 'av-red' : /priority/i.test(status) ? 'av-green' : 'av-gray';
+      const badge  = isOverdue ? 'overdue' : /priority/i.test(status) ? 'send' : 'active';
+      return { initials, name, role: r[2].trim(), action, status: badge, time: due, av };
+    });
+    out.outreach = out.contacts.map(c => ({
+      ...c, msg: '', status: c.status === 'overdue' ? 'send' : c.status
+    }));
   }
 
   // Log — handles ## Section 3 or ## Log
@@ -600,7 +622,16 @@ function renderPrime() {
 function getPeakTime(){const now=new Date(),end=new Date(now);end.setHours(11,0,0,0);const d=Math.max(0,end-now),h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000),s=Math.floor((d%60000)/1000);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;}
 function renderPeak(){const top=data.tenX.find(t=>!t.done&&t.pri)||data.tenX.find(t=>!t.done);const rows=data.tenX.map(t=>`<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');return`${modeHero('peak')}<div class="focus-block"><div class="countdown" id="countdown">${getPeakTime()}</div><div class="countdown-label">remaining in peak window</div><div class="focus-priority"><div class="fp-label">Top Priority</div><div class="fp-text">${top?top.label:'All 10x done'}</div></div></div><div style="padding:0 24px 20px;"><div class="section-label">10x Items</div>${rows}</div>`;}
 function renderRebuild(){const done=data.tenX.filter(t=>t.done).length,total=data.tenX.length,pct=total?Math.round(done/total*100):0;const contacts=data.contacts.filter(c=>c.status==='overdue'||c.status==='send').slice(0,3).map(c=>`<div class="contact-row"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}</div></div>`).join('');return`${modeHero('rebuild')}<div class="progress-card"><div style="display:flex;justify-content:space-between;align-items:center;"><span class="section-label" style="color:var(--amber);margin:0;">Day Progress</span><span style="font-size:13px;font-weight:700;color:var(--amber-text);">${done} of ${total} done</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><span style="font-size:12px;color:var(--amber-text);">Keep pushing through rebuild window</span></div><div style="padding:0 24px 20px;"><div class="section-label">Who to Reach</div>${contacts}</div>`;}
-function renderExecute(){const q=data.outreach.map((c,i)=>`<div style="${i<data.outreach.length-1?'padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px;':''}"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar-sm ${c.av}">${c.initials}</div><div style="flex:1;"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><button class="send-btn ${c.status==='draft'?'draft':''}">${c.status==='draft'?'Draft':'Send'}</button></div><div class="msg-preview ${c.status==='draft'?'drafting':''}">${c.msg}</div></div>`).join('');const hits=data.tenX.filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');return`${modeHero('execute')}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;}
+function renderExecute(){
+  const q=data.outreach.map((c,i)=>{
+    const border=i<data.outreach.length-1?'padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px;':'';
+    const msgHtml=c.msg?`<div class="msg-preview ${c.status==='draft'?'drafting':''}">${c.msg}</div>`
+      :`<div style="font-size:12px;color:var(--text-4);margin-top:6px;font-style:italic;">${c.action}</div>`;
+    return`<div style="${border}"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar-sm ${c.av}">${c.initials}</div><div style="flex:1;"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role}</div></div><button class="send-btn ${c.status==='draft'?'draft':''}">${c.status==='draft'?'Draft':'Send'}</button></div>${msgHtml}</div>`;
+  }).join('');
+  const hits=data.tenX.filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
+  return`${modeHero('execute')}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;
+}
 function renderWrap(){const w=data.wrap;const stats=w.stats.map(s=>`<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');const refl=w.reflection.map(r=>`<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');const tmrw=w.tomorrow.map((t,i)=>`<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');return`${modeHero('wrap')}<div class="day-score-card"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;"><div><div class="section-label" style="color:var(--dark-text-3);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--dark-text-2);">%</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div></div><div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint-bg);border-radius:999px;height:6px;width:${w.score}%;"></div></div></div><div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Tomorrow's Top 3</div>${tmrw}</div><div style="padding:0 24px 20px;"><div class="wrap-cta"><div><div class="wrap-cta-title">Run End-of-Day Wrap</div><div class="wrap-cta-sub">Stone stages tomorrow's brief</div></div><div class="wrap-icon">${arr()}</div></div></div>`;}
 
 /* ---- TAB RENDERS ---- */
@@ -714,6 +745,8 @@ async function fetchFromGitHub(dateStr) {
       if (parsed.schedule)    data.schedule    = parsed.schedule;
       if (parsed.tenX)        data.tenX        = parsed.tenX;
       if (parsed.log)         data.log         = parsed.log;
+      if (parsed.contacts)    data.contacts    = parsed.contacts;
+      if (parsed.outreach)    data.outreach    = parsed.outreach;
       banner.style.display = 'none';
     } else if (r.status === 404 && isToday(currentDate)) {
       banner.style.display = 'block';
@@ -770,12 +803,21 @@ async function loadAndRender(dir) {
 /* ---- NARRATION ---- */
 const micInput=document.getElementById('mic-input'),micBtn=document.getElementById('mic-btn');
 let SR=null,listening=false;
-if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
+const speechSupported=('webkitSpeechRecognition' in window||'SpeechRecognition' in window) && location.protocol==='https:';
+if(speechSupported){
   const C=window.SpeechRecognition||window.webkitSpeechRecognition;SR=new C();SR.continuous=false;SR.interimResults=false;SR.lang='en-US';
   SR.onresult=e=>{micInput.value=e.results[0][0].transcript;};
   SR.onend=()=>{listening=false;micBtn.classList.remove('listening');if(micInput.value.trim())submitLog();};
+  SR.onerror=()=>{listening=false;micBtn.classList.remove('listening');};
+} else {
+  micBtn.title='Voice requires HTTPS — type your note and press Enter';
+  micBtn.style.opacity='0.4';
 }
-micBtn.addEventListener('click',()=>{if(!SR)return;if(!listening){listening=true;micBtn.classList.add('listening');SR.start();}else SR.stop();});
+micBtn.addEventListener('click',()=>{
+  if(!SR){micInput.focus();return;}
+  if(!listening){listening=true;micBtn.classList.add('listening');try{SR.start();}catch(e){listening=false;micBtn.classList.remove('listening');}}
+  else SR.stop();
+});
 micInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&micInput.value.trim())submitLog();});
 function submitLog(){const text=micInput.value.trim();if(!text)return;const now=new Date();data.log.push({time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,entry:text});micInput.value='';if(activeTab==='home'||activeTab==='day')render(activeTab);}
 
