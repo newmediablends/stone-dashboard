@@ -234,6 +234,13 @@
     .tmrw-text { font-size: 14px; color: var(--text); }
 
     .connected-note { font-size: 11px; color: var(--text-4); padding: 4px 24px 0; flex-shrink: 0; }
+
+    .date-nav { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 24px 2px; flex-shrink:0; }
+    .day-nav-btn { background:none; border:none; font-size:20px; line-height:1; color:var(--text-3); cursor:pointer; padding:4px 10px; border-radius:8px; transition:background .15s,color .15s; -webkit-tap-highlight-color:transparent; }
+    .day-nav-btn:not(:disabled):hover { background:var(--bg-surface); color:var(--text); }
+    .day-nav-btn:disabled { opacity:0.25; cursor:default; }
+    .day-label { font-size:13px; font-weight:600; color:var(--text-2); letter-spacing:.02em; min-width:148px; text-align:center; user-select:none; }
+    .day-label.past { color:var(--amber); }
   </style>
 </head>
 <body>
@@ -256,6 +263,11 @@
     </div>
   </div>
   <div id="connected-note" class="connected-note" style="display:none;"></div>
+  <div id="date-nav" class="date-nav" style="display:none;">
+    <button class="day-nav-btn" id="prev-day" title="Previous day">&#8249;</button>
+    <span class="day-label" id="day-label">Today</span>
+    <button class="day-nav-btn" id="next-day" title="Next day" disabled>&#8250;</button>
+  </div>
   <div class="tab-bar" id="tab-bar" style="display:none;">
     <button class="tab-pill active" data-tab="home">Home</button>
     <button class="tab-pill" data-tab="day">Day</button>
@@ -469,12 +481,9 @@ async function scanProjects(dir) {
 }
 
 /* ---- LOAD REAL DATA ---- */
-async function loadRealData(rootDir) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-
+async function loadRealData(dir, dateStr) {
   try {
-    const dailyDir = await rootDir.getDirectoryHandle('Daily').catch(()=>null);
+    const dailyDir = await dir.getDirectoryHandle('Daily').catch(()=>null);
     if (dailyDir) {
       const brief = await dailyDir.getFileHandle('Tomorrow-Brief.md').catch(()=>null);
       if (brief) {
@@ -495,7 +504,7 @@ async function loadRealData(rootDir) {
   } catch (e) { console.warn('Daily note:', e); }
 
   try {
-    const resDir = await rootDir.getDirectoryHandle('3-Resources').catch(()=>null);
+    const resDir = await dir.getDirectoryHandle('3-Resources').catch(()=>null);
     if (resDir) {
       const tracker = await resDir.getFileHandle('Network-Tracker.md').catch(()=>null);
       if (tracker) {
@@ -507,7 +516,7 @@ async function loadRealData(rootDir) {
   } catch (e) { console.warn('Network Tracker:', e); }
 
   try {
-    const projDir = await rootDir.getDirectoryHandle('1-Projects').catch(()=>null);
+    const projDir = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
     if (projDir) {
       const projects = await scanProjects(projDir);
       if (projects.length) data.projects = projects;
@@ -645,10 +654,81 @@ document.getElementById('tab-bar').addEventListener('click', e=>{
   if(p) render(p.dataset.tab);
 });
 
-async function loadAndRender(dir) {
-  const dateStr = await loadRealData(dir);
+/* ---- DATE NAVIGATION ---- */
+let currentDate = new Date();
+let activeRootDir = null;
+
+function formatDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function isToday(d) {
+  const t = new Date();
+  return d.toDateString() === t.toDateString();
+}
+function updateDateNav() {
+  const lbl = document.getElementById('day-label');
+  const nxt = document.getElementById('next-day');
+  const today = isToday(currentDate);
+  lbl.textContent = today
+    ? 'Today · ' + currentDate.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+    : currentDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  lbl.className = 'day-label' + (today ? '' : ' past');
+  nxt.disabled = today;
+}
+
+async function fetchFromGitHub(dateStr) {
+  try {
+    const r = await fetch(`daily/${dateStr}.md`);
+    if (r.ok) {
+      const txt = await r.text();
+      const parsed = parseDailyNote(txt);
+      if (parsed.faithAnchor) data.faithAnchor = parsed.faithAnchor;
+      if (parsed.schedule)    data.schedule    = parsed.schedule;
+      if (parsed.tenX)        data.tenX        = parsed.tenX;
+      if (parsed.log)         data.log         = parsed.log;
+    }
+  } catch {}
+  try {
+    const r = await fetch('daily/Network-Tracker.md');
+    if (r.ok) {
+      const txt = await r.text();
+      const contacts = parseNetworkTracker(txt);
+      if (contacts && contacts.length) data.contacts = contacts;
+    }
+  } catch {}
+}
+
+async function navigateDay(delta) {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + delta);
+  if (d > new Date()) return;
+  currentDate = d;
+  data = JSON.parse(JSON.stringify(sample));
+  updateDateNav();
+  const dateStr = formatDate(currentDate);
+  if (activeRootDir) {
+    await loadRealData(activeRootDir, dateStr);
+  } else {
+    await fetchFromGitHub(dateStr);
+  }
+  render(activeTab === 'home' ? 'home' : activeTab);
+}
+
+document.getElementById('prev-day').addEventListener('click', () => navigateDay(-1));
+document.getElementById('next-day').addEventListener('click', () => navigateDay(+1));
+
+function showAppShell() {
   document.getElementById('tab-bar').style.display = 'flex';
   document.getElementById('mic-bar').style.display  = 'block';
+  document.getElementById('date-nav').style.display = 'flex';
+  updateDateNav();
+}
+
+async function loadAndRender(dir) {
+  activeRootDir = dir;
+  const dateStr = formatDate(currentDate);
+  await loadRealData(dir, dateStr);
+  showAppShell();
   const note = document.getElementById('connected-note');
   note.style.display = 'block';
   note.textContent = `Connected · ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}`;
@@ -672,9 +752,9 @@ const hasFileAccess = typeof window.showDirectoryPicker === 'function';
 
 async function init() {
   if (!hasFileAccess) {
-    // iOS Safari / Firefox — no File System Access; run on sample data
-    document.getElementById('tab-bar').style.display = 'flex';
-    document.getElementById('mic-bar').style.display  = 'block';
+    // iOS Safari / Firefox — fetch synced markdown files from GitHub Pages
+    showAppShell();
+    await fetchFromGitHub(formatDate(currentDate));
     render('home');
     return;
   }
