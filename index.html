@@ -249,11 +249,16 @@
     /* MASK Journal — Day tab */
     .mask-journal-card { display:flex; gap:14px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border-light); }
     .mask-journal-card:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
-    .mask-journal-letter { width:28px; height:28px; border-radius:8px; background:var(--mint-bg); color:var(--mint-text); font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .mask-journal-label { font-size:11px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+    .mask-journal-letter { width:28px; height:28px; border-radius:8px; background:var(--mint-bg); color:var(--mint-text); font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+    .mask-journal-label { font-size:11px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:.06em; }
     .mask-journal-prompt { font-size:13px; color:var(--text-3); line-height:18px; margin-bottom:6px; }
     .mask-journal-response { font-size:14px; color:var(--text); line-height:20px; font-style:italic; border-left:2px solid var(--mint-text); padding-left:10px; }
     .mask-journal-pending { font-size:12px; color:var(--text-4); font-style:italic; }
+    .mask-edit-btn { font-size:11px; font-weight:700; color:var(--mint-text); background:var(--mint-bg); border:none; padding:3px 9px; border-radius:5px; cursor:pointer; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
+    .mask-journal-textarea { width:100%; font-size:15px; color:var(--text); background:var(--bg-card); border:1.5px solid var(--border); border-radius:10px; padding:10px 12px; font-family:inherit; line-height:22px; resize:none; min-height:80px; outline:none; margin-top:6px; -webkit-appearance:none; }
+    .mask-journal-textarea:focus { border-color:var(--mint-text); }
+    .mask-save-btn { background:var(--green-btn); color:#fff; font-size:13px; font-weight:700; padding:9px 18px; border-radius:999px; border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .mask-cancel-btn { background:var(--bg-surface); color:var(--text-3); font-size:13px; font-weight:600; padding:9px 16px; border-radius:999px; border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 
     .date-nav { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 24px 2px; flex-shrink:0; }
     .day-nav-btn { background:none; border:none; font-size:20px; line-height:1; color:var(--text-3); cursor:pointer; padding:4px 10px; border-radius:8px; transition:background .15s,color .15s; -webkit-tap-highlight-color:transparent; }
@@ -507,12 +512,15 @@ function parseDailyNote(md) {
 
   // Log — handles ## Section 3 or ## Log
   const logSec = section(md, 'Section 3[^#\n]*', 'Log');
-  const timestamped = [...logSec.matchAll(/^-\s+(\d{1,2}:\d{2})\s*[-–]\s*(.+)$/gm)];
-  if (timestamped.length) {
-    out.log = timestamped.map(m => ({ time: m[1], entry: m[2].trim() }));
-  } else {
-    const plain = [...logSec.matchAll(/^-\s+(.+)$/gm)].filter(m => !/^#|----|^>/.test(m[1]));
-    if (plain.length) out.log = plain.slice(0, 10).map(m => ({ time: '—', entry: m[1].trim() }));
+  const allLogLines = [...logSec.matchAll(/^-\s+(.+)$/gm)]
+    .filter(m => !/^---|^>|^#/.test(m[1].trim()));
+  if (allLogLines.length) {
+    out.log = allLogLines.map(m => {
+      const line = m[1];
+      const ts = line.match(/^(\d{1,2}:\d{2})\s*[-–]\s*(.+)/);
+      if (ts) return { time: ts[1], entry: ts[2].trim() };
+      return { time: '—', entry: line.trim() };
+    });
   }
 
   return out;
@@ -637,10 +645,14 @@ function modeHero(m) {
 /* ---- HELPERS ---- */
 const chk = () => `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const arr = () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function typeBadge(t) {
-  const m={Mind:'bg-green',Rel:'bg-amber',Pres:'bg-purple'};
-  return `<span class="badge ${m[t]||'bg-gray'}">${t||'—'}</span>`;
+  t = (t||'').trim();
+  if (/^mind/i.test(t))  return `<span class="badge bg-green">Mind</span>`;
+  if (/^rel/i.test(t))   return `<span class="badge bg-amber">Rel</span>`;
+  if (/^pres/i.test(t))  return `<span class="badge bg-purple">Pres</span>`;
+  return `<span class="badge bg-gray">${esc(t)||'—'}</span>`;
 }
 function statusBadge(s) {
   const m={active:['bg-green','Active'],slow:['bg-amber','Slow'],blocked:['bg-red','Blocked'],overdue:['bg-red','Overdue'],send:['bg-green','Send'],draft:['bg-amber','Draft'],waiting:['bg-gray','Waiting']};
@@ -685,7 +697,17 @@ function renderDay(){
 
   const maskHtml = data.maskJournal && data.maskJournal.length
     ? `<div class="section"><div class="section-label">MASK Journal</div>${
-        data.maskJournal.map(m=>`<div class="mask-journal-card"><div class="mask-journal-letter">${m.letter}</div><div style="flex:1;"><div class="mask-journal-label">${m.label}</div><div class="mask-journal-prompt">${m.prompt}</div>${m.response?`<div class="mask-journal-response">${m.response}</div>`:'<div class="mask-journal-pending">Not yet answered</div>'}</div></div>`).join('')
+        data.maskJournal.map(m=>`<div class="mask-journal-card" id="mask-card-${m.letter}">
+          <div class="mask-journal-letter">${m.letter}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px;">
+              <div class="mask-journal-label">${esc(m.label)}</div>
+              <button class="mask-edit-btn" onclick="openMaskEdit('${m.letter}')">${m.response?'Edit':'Answer'}</button>
+            </div>
+            <div class="mask-journal-prompt">${esc(m.prompt)}</div>
+            ${m.response?`<div class="mask-journal-response">${esc(m.response)}</div>`:'<div class="mask-journal-pending">Tap Answer to respond</div>'}
+          </div>
+        </div>`).join('')
       }</div>` : '';
 
   return`<div class="faith-anchor">${data.faithAnchor}</div><div class="section"><div class="section-label">Schedule</div>${sched}</div><div class="section"><div class="section-label">10x Items</div>${tenx}</div>${qhHtml}${maskHtml}<div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div>`;
@@ -916,6 +938,66 @@ async function submitLog(){
       });
     }catch{}
   }
+}
+
+/* ---- MASK EDIT ---- */
+function openMaskEdit(letter) {
+  const m = data.maskJournal && data.maskJournal.find(x => x.letter === letter);
+  if (!m) return;
+  const card = document.getElementById('mask-card-' + letter);
+  if (!card) return;
+  card.innerHTML = `
+    <div class="mask-journal-letter">${m.letter}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="mask-journal-label" style="margin-bottom:3px;">${esc(m.label)}</div>
+      <div class="mask-journal-prompt">${esc(m.prompt)}</div>
+      <textarea class="mask-journal-textarea" id="mask-ta-${letter}" placeholder="Write your response...">${esc(m.response||'')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="mask-save-btn" onclick="saveMaskEdit('${letter}')">Save</button>
+        <button class="mask-cancel-btn" onclick="cancelMaskEdit('${letter}')">Cancel</button>
+      </div>
+    </div>`;
+  const ta = document.getElementById('mask-ta-' + letter);
+  ta.style.height = 'auto';
+  ta.style.height = (ta.scrollHeight + 4) + 'px';
+  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 4) + 'px'; });
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = ta.value.length;
+}
+
+function cancelMaskEdit(letter) {
+  render('day');
+  setTimeout(() => {
+    const card = document.getElementById('mask-card-' + letter);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
+}
+
+async function saveMaskEdit(letter) {
+  const ta = document.getElementById('mask-ta-' + letter);
+  if (!ta) return;
+  const response = ta.value.trim();
+  if (!response) { ta.focus(); return; }
+
+  const m = data.maskJournal && data.maskJournal.find(x => x.letter === letter);
+  if (m) m.response = response;
+
+  if (isLocalServer) {
+    try {
+      await fetch('/daily/mask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: formatDate(currentDate), letter, response })
+      });
+    } catch {}
+  }
+
+  render('day');
+  // Scroll the saved card into view
+  setTimeout(() => {
+    const card = document.getElementById('mask-card-' + letter);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
 }
 
 /* ---- INIT ---- */

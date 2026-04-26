@@ -66,6 +66,56 @@ def ensure_cert(ip):
     print("  ────────────────────────────────────────────────────────")
 
 
+# ── MASK write-back ───────────────────────────────────────────────────────────
+
+def write_mask_response(date_str, letter, response):
+    note_path = DAILY_DIR / f"{date_str}.md"
+    if not note_path.exists():
+        return False
+    lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    in_mask = False
+    prompt_idx = -1
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if re.match(r'^##\s+MASK Journal', stripped):
+            in_mask = True
+            continue
+        if in_mask:
+            if stripped.startswith("## "):
+                break
+            if re.match(rf'^\*\*{re.escape(letter)}:\*\*', stripped):
+                prompt_idx = i
+                break
+
+    if prompt_idx < 0:
+        return False
+
+    # Find boundary: next **X:** or section heading or end
+    search_end = len(lines)
+    for i in range(prompt_idx + 1, len(lines)):
+        stripped = lines[i].strip()
+        if re.match(r'^\*\*[MASK]:\*\*', stripped) or stripped.startswith("## "):
+            search_end = i
+            break
+
+    # Replace existing blockquote or insert after prompt
+    response_line = f"> {response}\n"
+    existing = -1
+    for i in range(prompt_idx + 1, search_end):
+        if lines[i].strip().startswith(">"):
+            existing = i
+            break
+
+    if existing >= 0:
+        lines[existing] = response_line
+    else:
+        lines.insert(prompt_idx + 1, response_line)
+
+    note_path.write_text("".join(lines), encoding="utf-8")
+    return True
+
+
 # ── Log write-back ────────────────────────────────────────────────────────────
 
 def append_log(date_str, time_str, entry):
@@ -167,8 +217,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
                 else:
                     self.send_error(400)
-            except Exception as e:
+            except Exception:
                 self.send_error(500)
+
+        elif path == "/daily/mask":
+            try:
+                length   = int(self.headers.get("Content-Length", 0))
+                body     = json.loads(self.rfile.read(length))
+                date_s   = body.get("date", "")
+                letter   = body.get("letter", "").upper()
+                response = body.get("response", "").strip()
+                if date_s and letter in "MASK" and len(letter) == 1 and response and re.match(r"\d{4}-\d{2}-\d{2}$", date_s):
+                    ok = write_mask_response(date_s, letter, response)
+                    self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
+                else:
+                    self.send_error(400)
+            except Exception:
+                self.send_error(500)
+
         else:
             self.send_error(404)
 
