@@ -257,7 +257,8 @@
     .mask-journal-prompt { font-size:13px; color:var(--text-3); line-height:18px; margin-bottom:6px; }
     .mask-journal-response { font-size:14px; color:var(--text); line-height:20px; font-style:italic; border-left:2px solid var(--mint-text); padding-left:10px; }
     .mask-journal-pending { font-size:12px; color:var(--text-4); font-style:italic; }
-    .mask-edit-btn { font-size:11px; font-weight:700; color:var(--mint-text); background:var(--mint-bg); border:none; padding:3px 9px; border-radius:5px; cursor:pointer; -webkit-tap-highlight-color:transparent; flex-shrink:0; }
+    .mask-journal-card.tappable { cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.04); transition: opacity 0.1s; }
+    .mask-journal-card.tappable:active { opacity: 0.6; }
     .mask-journal-textarea { width:100%; font-size:15px; color:var(--text); background:var(--bg-card); border:1.5px solid var(--border); border-radius:10px; padding:10px 12px; font-family:inherit; line-height:22px; resize:none; min-height:80px; outline:none; margin-top:6px; -webkit-appearance:none; }
     .mask-journal-textarea:focus { border-color:var(--mint-text); }
     .mask-save-btn { background:var(--green-btn); color:#fff; font-size:13px; font-weight:700; padding:9px 18px; border-radius:999px; border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -741,17 +742,18 @@ function renderDay(){
         data.quickHits.map(h=>`<div class="quick-hit ${h.stone?'stone-item':''}"><div class="qh-dot"></div><span class="qh-text">${h.stone?'<span class="stone-tag">Stone</span>':''}${h.label}</span></div>`).join('')
       }</div>` : '';
 
+  const _pencil = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--text-4);"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
   const maskHtml = data.maskJournal && data.maskJournal.length
     ? `<div class="section"><div class="section-label">MASK Journal</div>${
-        data.maskJournal.map(m=>`<div class="mask-journal-card" id="mask-card-${m.letter}">
+        data.maskJournal.map(m=>`<div class="mask-journal-card tappable" id="mask-card-${m.letter}" onclick="openMaskEdit('${m.letter}')">
           <div class="mask-journal-letter">${m.letter}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px;">
               <div class="mask-journal-label">${esc(m.label)}</div>
-              <button class="mask-edit-btn" onclick="openMaskEdit('${m.letter}')">${m.response?'Edit':'Answer'}</button>
+              ${_pencil}
             </div>
             <div class="mask-journal-prompt">${esc(m.prompt)}</div>
-            ${m.response?`<div class="mask-journal-response">${esc(m.response)}</div>`:'<div class="mask-journal-pending">Tap Answer to respond</div>'}
+            ${m.response?`<div class="mask-journal-response">${esc(m.response)}</div>`:'<div class="mask-journal-pending">Tap to answer</div>'}
           </div>
         </div>`).join('')
       }</div>` : '';
@@ -991,7 +993,11 @@ function openMaskEdit(letter) {
   const m = data.maskJournal && data.maskJournal.find(x => x.letter === letter);
   if (!m) return;
   const card = document.getElementById('mask-card-' + letter);
-  if (!card) return;
+  if (!card || card.dataset.editing) return;
+  card.dataset.editing = '1';
+  card.classList.remove('tappable');
+  card.removeAttribute('onclick');
+  card.style.cursor = 'default';
   card.innerHTML = `
     <div class="mask-journal-letter">${m.letter}</div>
     <div style="flex:1;min-width:0;">
