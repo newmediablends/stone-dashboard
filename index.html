@@ -239,6 +239,22 @@
     .no-plan-banner { display:none; margin:8px 16px 0; padding:10px 14px; background:var(--amber-bg); border-radius:10px; border-left:3px solid var(--amber); }
     .no-plan-banner span { font-size:13px; color:var(--amber-text); font-weight:500; }
 
+    /* Quick Hits */
+    .quick-hit { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+    .qh-dot { width:6px; height:6px; border-radius:50%; background:var(--border); flex-shrink:0; margin-top:6px; }
+    .qh-text { font-size:14px; color:var(--text-2); line-height:20px; flex:1; }
+    .stone-tag { font-size:10px; font-weight:700; background:var(--mint-bg); color:var(--mint-text); padding:2px 6px; border-radius:4px; margin-right:6px; vertical-align:middle; }
+    .quick-hit.stone-item .qh-dot { background:var(--mint-text); opacity:0.4; }
+
+    /* MASK Journal — Day tab */
+    .mask-journal-card { display:flex; gap:14px; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border-light); }
+    .mask-journal-card:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+    .mask-journal-letter { width:28px; height:28px; border-radius:8px; background:var(--mint-bg); color:var(--mint-text); font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .mask-journal-label { font-size:11px; font-weight:700; color:var(--text-4); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+    .mask-journal-prompt { font-size:13px; color:var(--text-3); line-height:18px; margin-bottom:6px; }
+    .mask-journal-response { font-size:14px; color:var(--text); line-height:20px; font-style:italic; border-left:2px solid var(--mint-text); padding-left:10px; }
+    .mask-journal-pending { font-size:12px; color:var(--text-4); font-style:italic; }
+
     .date-nav { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 24px 2px; flex-shrink:0; }
     .day-nav-btn { background:none; border:none; font-size:20px; line-height:1; color:var(--text-3); cursor:pointer; padding:4px 10px; border-radius:8px; transition:background .15s,color .15s; -webkit-tap-highlight-color:transparent; }
     .day-nav-btn:not(:disabled):hover { background:var(--bg-surface); color:var(--text); }
@@ -449,6 +465,24 @@ function parseDailyNote(md) {
     }
   }
 
+  // MASK Journal
+  const maskSec = section(md, 'MASK Journal[^#\n]*');
+  if (maskSec) {
+    const labels = { M:'Mindset', A:'Action', S:'Spirituality', K:'Kindness' };
+    out.maskJournal = ['M','A','S','K'].map(l => {
+      const promptRe = new RegExp(`\\*\\*${l}:\\*\\*\\s*([^\n]+)`);
+      const pm = maskSec.match(promptRe);
+      const prompt = pm ? pm[1].trim() : '';
+      let response = '';
+      if (pm) {
+        const after = maskSec.slice(maskSec.indexOf(pm[0]) + pm[0].length);
+        const rm = after.match(/^\s*\n+>\s*(.+)/);
+        if (rm) response = rm[1].trim().replace(/^"|"$/g,'');
+      }
+      return { letter:l, label:labels[l], prompt, response };
+    }).filter(m => m.prompt);
+  }
+
   // Network Top 5 — from daily note table
   const netSec = section(md, 'Network[^#\n]*Top 5', 'Network — Top 5', 'Network Top 5', 'Network');
   const netRows = [...netSec.matchAll(/\|\s*([^|\-\n]{3,40}?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]+?)\s*\|\s*([^|\n]*?)\s*\|/g)]
@@ -548,6 +582,10 @@ async function loadRealData(dir, dateStr) {
         if (parsed.schedule)    data.schedule    = parsed.schedule;
         if (parsed.tenX)        data.tenX        = parsed.tenX;
         if (parsed.log)         data.log         = parsed.log;
+        if (parsed.contacts)    data.contacts    = parsed.contacts;
+        if (parsed.outreach)    data.outreach    = parsed.outreach;
+        if (parsed.maskJournal) data.maskJournal = parsed.maskJournal;
+        if (parsed.quickHits)   data.quickHits   = parsed.quickHits;
       }
     }
   } catch (e) { console.warn('Daily note:', e); }
@@ -639,7 +677,18 @@ function renderDay(){
   const sched=data.schedule.map(s=>`<div class="schedule-row"><div class="sched-time ${s.status==='now'?'now':''}">${s.time}</div><div class="sched-bar ${s.status==='upcoming'?'':s.status}"></div><div class="sched-content"><div class="sched-title ${s.status==='upcoming'?'dim':''}">${s.label}${s.status==='now'?'<span class="now-badge">NOW</span>':''}</div><div class="sched-sub ${s.status==='upcoming'?'dim':''}">${s.sub}</div></div></div>`).join('');
   const tenx=data.tenX.map(t=>`<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
   const log=data.log.length?data.log.map(l=>`<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-text">${l.entry}</span></div>`).join(''):`<div style="font-size:14px;color:var(--text-4);font-style:italic;">No entries yet. Narrate your day.</div>`;
-  return`<div class="faith-anchor">${data.faithAnchor}</div><div class="section"><div class="section-label">Schedule</div>${sched}</div><div class="section"><div class="section-label">10x Items</div>${tenx}</div><div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div>`;
+
+  const qhHtml = data.quickHits && data.quickHits.length
+    ? `<div class="section"><div class="section-label">Quick Hits</div>${
+        data.quickHits.map(h=>`<div class="quick-hit ${h.stone?'stone-item':''}"><div class="qh-dot"></div><span class="qh-text">${h.stone?'<span class="stone-tag">Stone</span>':''}${h.label}</span></div>`).join('')
+      }</div>` : '';
+
+  const maskHtml = data.maskJournal && data.maskJournal.length
+    ? `<div class="section"><div class="section-label">MASK Journal</div>${
+        data.maskJournal.map(m=>`<div class="mask-journal-card"><div class="mask-journal-letter">${m.letter}</div><div style="flex:1;"><div class="mask-journal-label">${m.label}</div><div class="mask-journal-prompt">${m.prompt}</div>${m.response?`<div class="mask-journal-response">${m.response}</div>`:'<div class="mask-journal-pending">Not yet answered</div>'}</div></div>`).join('')
+      }</div>` : '';
+
+  return`<div class="faith-anchor">${data.faithAnchor}</div><div class="section"><div class="section-label">Schedule</div>${sched}</div><div class="section"><div class="section-label">10x Items</div>${tenx}</div>${qhHtml}${maskHtml}<div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div>`;
 }
 function renderPeople(){
   const overdue=data.contacts.filter(c=>c.status==='overdue'),priority=data.contacts.filter(c=>c.status!=='overdue');
@@ -775,6 +824,8 @@ async function fetchFromGitHub(dateStr) {
       if (parsed.log)         data.log         = parsed.log;
       if (parsed.contacts)    data.contacts    = parsed.contacts;
       if (parsed.outreach)    data.outreach    = parsed.outreach;
+      if (parsed.maskJournal) data.maskJournal = parsed.maskJournal;
+      if (parsed.quickHits)   data.quickHits   = parsed.quickHits;
       banner.style.display = 'none';
     } else if (r.status === 404 && isToday(currentDate)) {
       banner.style.display = 'block';
