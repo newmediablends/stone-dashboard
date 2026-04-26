@@ -734,6 +734,34 @@ function updateDateNav() {
   nxt.disabled = today;
 }
 
+async function fetchProjects() {
+  try {
+    const r = await fetch('/projects');
+    if (!r.ok) return;
+    const names = (await r.text()).split('\n').filter(Boolean);
+    const projects = [];
+    for (const name of names.slice(0, 10)) {
+      const proj = { name, sub:'', status:'active', pri:'M', next:'—', blocked:false };
+      try {
+        const sr = await fetch(`/projects/${encodeURIComponent(name)}/Status.md`);
+        if (sr.ok) {
+          const txt = await sr.text();
+          const statusM = txt.match(/\*\*Status[^:]*:\*\*\s*([^\n]+)/i);
+          const nextM   = txt.match(/\*\*Next[^:]*:\*\*\s*([^\n]+)/i);
+          const priM    = txt.match(/\*\*Priority[^:]*:\*\*\s*([HML])/i);
+          const subM    = txt.match(/^>\s*(.{10,60})$/m) || txt.match(/^[A-Z][^#\n].{10,60}$/m);
+          if (statusM) { const s=statusM[1].toLowerCase(); proj.status=s.includes('block')?'blocked':s.includes('slow')?'slow':'active'; proj.blocked=proj.status==='blocked'; }
+          if (nextM)   proj.next = nextM[1].trim().substring(0,80);
+          if (priM)    proj.pri  = priM[1].toUpperCase();
+          if (subM)    proj.sub  = subM[1].trim().substring(0,45);
+        }
+      } catch {}
+      projects.push(proj);
+    }
+    if (projects.length) data.projects = projects;
+  } catch {}
+}
+
 async function fetchFromGitHub(dateStr) {
   const banner = document.getElementById('no-plan-banner');
   try {
@@ -760,6 +788,7 @@ async function fetchFromGitHub(dateStr) {
       if (contacts && contacts.length) data.contacts = contacts;
     }
   } catch {}
+  if (isLocalServer) await fetchProjects();
 }
 
 async function navigateDay(delta) {
@@ -803,7 +832,7 @@ async function loadAndRender(dir) {
 /* ---- NARRATION ---- */
 const micInput=document.getElementById('mic-input'),micBtn=document.getElementById('mic-btn');
 let SR=null,listening=false;
-const speechSupported=('webkitSpeechRecognition' in window||'SpeechRecognition' in window) && location.protocol==='https:';
+const speechSupported=('webkitSpeechRecognition' in window||'SpeechRecognition' in window) && (location.protocol==='https:' || location.hostname==='localhost');
 if(speechSupported){
   const C=window.SpeechRecognition||window.webkitSpeechRecognition;SR=new C();SR.continuous=false;SR.interimResults=false;SR.lang='en-US';
   SR.onresult=e=>{micInput.value=e.results[0][0].transcript;};
@@ -819,7 +848,24 @@ micBtn.addEventListener('click',()=>{
   else SR.stop();
 });
 micInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&micInput.value.trim())submitLog();});
-function submitLog(){const text=micInput.value.trim();if(!text)return;const now=new Date();data.log.push({time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,entry:text});micInput.value='';if(activeTab==='home'||activeTab==='day')render(activeTab);}
+async function submitLog(){
+  const text=micInput.value.trim();
+  if(!text)return;
+  const now=new Date();
+  const timeStr=`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  data.log.push({time:timeStr,entry:text});
+  micInput.value='';
+  if(activeTab==='home'||activeTab==='day')render(activeTab);
+  if(isLocalServer && isToday(currentDate)){
+    try{
+      await fetch('/daily/log',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({date:formatDate(currentDate),time:timeStr,entry:text})
+      });
+    }catch{}
+  }
+}
 
 /* ---- INIT ---- */
 const hasFileAccess = typeof window.showDirectoryPicker === 'function';
