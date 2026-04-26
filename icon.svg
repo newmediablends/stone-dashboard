@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1E5C3A"/>
+      <stop offset="100%" stop-color="#0F2E1D"/>
+    </radialGradient>
+    <radialGradient id="stone" cx="38%" cy="32%" r="60%">
+      <stop offset="0%" stop-color="#F0FDF8"/>
+      <stop offset="45%" stop-color="#C6F0DC"/>
+      <stop offset="100%" stop-color="#86EFAC"/>
+    </radialGradient>
+    <filter id="drop" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#051A0D" flood-opacity="0.55"/>
+    </filter>
+    <filter id="inner" x="0%" y="0%" width="100%" height="100%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur"/>
+      <feOffset dx="0" dy="-4" result="offset"/>
+      <feComposite in="SourceGraphic" in2="offset" operator="over"/>
+    </filter>
+    <clipPath id="round">
+      <rect width="512" height="512" rx="115"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+
+  <!-- Subtle grid texture on background -->
+  <rect width="512" height="512" rx="115" fill="none"
+        stroke="#1A4731" stroke-width="1" opacity="0.2"/>
+
+  <!-- Stone body — smooth irregular oval/boulder -->
+  <g filter="url(#drop)">
+    <path d="
+      M258 96
+      C296 90  348 107 385 140
+      C428 178 440 236 430 292
+      C420 350 382 396 325 416
+      C268 436 198 426 155 390
+      C108 350  90 290 100 232
+      C110 176 148 130 196 110
+      C220 100 240 97 258 96 Z
+    " fill="url(#stone)"/>
+  </g>
+
+  <!-- Highlight streak — top-left catch light -->
+  <path d="M 175 162 C 200 148 232 143 258 150"
+        stroke="white" stroke-width="11" stroke-linecap="round"
+        fill="none" opacity="0.65"/>
+
+  <!-- Secondary micro-highlight -->
+  <path d="M 168 195 C 178 188 192 185 205 187"
+        stroke="white" stroke-width="6" stroke-linecap="round"
+        fill="none" opacity="0.3"/>
+
+  <!-- Stone edge — subtle rim shadow to give depth -->
+  <path d="
+    M258 96
+    C296 90  348 107 385 140
+    C428 178 440 236 430 292
+    C420 350 382 396 325 416
+    C268 436 198 426 155 390
+    C108 350  90 290 100 232
+    C110 176 148 130 196 110
+    C220 100 240 97 258 96 Z
+  " fill="none" stroke="#4ADE80" stroke-width="2" opacity="0.25"/>
+</svg>
