@@ -577,7 +577,7 @@ function renderDay(){
 function renderPeople(){
   const overdue=data.contacts.filter(c=>c.status==='overdue'),priority=data.contacts.filter(c=>c.status!=='overdue');
   const row=c=>`<div class="contact-row"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;
-  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div><div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
+  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div><div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
 }
 function renderProjects(){
   const cards=data.projects.map(p=>`<div class="project-card"><div class="proj-header"><div><div class="proj-name">${p.name}</div><div class="proj-sub">${p.sub}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${statusBadge(p.status)}<span class="badge ${p.pri==='H'?'pri-h':p.pri==='M'?'pri-m':'pri-l'}">${p.pri}</span></div></div><div class="proj-next"><span class="proj-next-label ${p.blocked?'blocked':''}">${p.blocked?'Blocked':'Next'} → </span>${p.next}</div></div>`).join('');
@@ -603,6 +603,10 @@ function showConnectScreen() {
 }
 
 async function connectAndLoad() {
+  if (!hasFileAccess) {
+    alert('File access is not supported in this browser. Open on desktop Chrome or Edge to connect your Second Brain.');
+    return;
+  }
   try {
     const dir = await window.showDirectoryPicker({ mode: 'read' });
     await saveHandle(dir);
@@ -664,7 +668,16 @@ micInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&micInput.value.trim(
 function submitLog(){const text=micInput.value.trim();if(!text)return;const now=new Date();data.log.push({time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,entry:text});micInput.value='';if(activeTab==='home'||activeTab==='day')render(activeTab);}
 
 /* ---- INIT ---- */
+const hasFileAccess = typeof window.showDirectoryPicker === 'function';
+
 async function init() {
+  if (!hasFileAccess) {
+    // iOS Safari / Firefox — no File System Access; run on sample data
+    document.getElementById('tab-bar').style.display = 'flex';
+    document.getElementById('mic-bar').style.display  = 'block';
+    render('home');
+    return;
+  }
   try {
     const stored = await loadHandle();
     if (stored) {
