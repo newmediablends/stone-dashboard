@@ -235,6 +235,9 @@
 
     .connected-note { font-size: 11px; color: var(--text-4); padding: 4px 24px 0; flex-shrink: 0; }
 
+    .no-plan-banner { display:none; margin:8px 16px 0; padding:10px 14px; background:var(--amber-bg); border-radius:10px; border-left:3px solid var(--amber); }
+    .no-plan-banner span { font-size:13px; color:var(--amber-text); font-weight:500; }
+
     .date-nav { display:flex; align-items:center; justify-content:center; gap:12px; padding:8px 24px 2px; flex-shrink:0; }
     .day-nav-btn { background:none; border:none; font-size:20px; line-height:1; color:var(--text-3); cursor:pointer; padding:4px 10px; border-radius:8px; transition:background .15s,color .15s; -webkit-tap-highlight-color:transparent; }
     .day-nav-btn:not(:disabled):hover { background:var(--bg-surface); color:var(--text); }
@@ -267,6 +270,9 @@
     <button class="day-nav-btn" id="prev-day" title="Previous day">&#8249;</button>
     <span class="day-label" id="day-label">Today</span>
     <button class="day-nav-btn" id="next-day" title="Next day" disabled>&#8250;</button>
+  </div>
+  <div id="no-plan-banner" class="no-plan-banner">
+    <span>No plan yet for today — run Plan My Day in Stone</span>
   </div>
   <div class="tab-bar" id="tab-bar" style="display:none;">
     <button class="tab-pill active" data-tab="home">Home</button>
@@ -677,6 +683,7 @@ function updateDateNav() {
 }
 
 async function fetchFromGitHub(dateStr) {
+  const banner = document.getElementById('no-plan-banner');
   try {
     const r = await fetch(`daily/${dateStr}.md`);
     if (r.ok) {
@@ -686,6 +693,9 @@ async function fetchFromGitHub(dateStr) {
       if (parsed.schedule)    data.schedule    = parsed.schedule;
       if (parsed.tenX)        data.tenX        = parsed.tenX;
       if (parsed.log)         data.log         = parsed.log;
+      banner.style.display = 'none';
+    } else if (r.status === 404 && isToday(currentDate)) {
+      banner.style.display = 'block';
     }
   } catch {}
   try {
@@ -704,6 +714,7 @@ async function navigateDay(delta) {
   if (d > new Date()) return;
   currentDate = d;
   data = JSON.parse(JSON.stringify(sample));
+  document.getElementById('no-plan-banner').style.display = 'none';
   updateDateNav();
   const dateStr = formatDate(currentDate);
   if (activeRootDir && !isLocalServer) {
