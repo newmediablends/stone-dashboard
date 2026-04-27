@@ -330,6 +330,11 @@
   </div>
   <div id="ptr-indicator" style="position:absolute;left:0;right:0;display:flex;justify-content:center;padding:6px 0;opacity:0;pointer-events:none;z-index:50;transition:opacity 0.15s;"><svg id="ptr-svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="var(--mint-text)" stroke-width="2" stroke-linecap="round"/></svg></div>
   <div class="content" id="content"></div>
+  <div id="contact-sheet" style="position:absolute;bottom:0;left:0;right:0;background:var(--bg-card);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding:0 0 calc(24px + env(safe-area-inset-bottom,20px));z-index:200;transform:translateY(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);box-shadow:0 -4px 32px rgba(0,0,0,0.18);">
+    <div style="display:flex;justify-content:center;padding:10px 0 4px;"><div style="width:36px;height:4px;border-radius:2px;background:var(--border);"></div></div>
+    <div id="contact-sheet-body" style="padding:8px 24px 0;"></div>
+  </div>
+  <div id="contact-sheet-overlay" onclick="closeContactDetail()" style="position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:199;display:none;"></div>
   <div class="mic-bar" id="mic-bar" style="display:none;">
     <div class="mic-inner">
       <input class="mic-text" id="mic-input" type="text" placeholder="Narrate your progress...">
@@ -434,6 +439,7 @@ const sample = {
 };
 
 let data = JSON.parse(JSON.stringify(sample));
+data.batchQueue = null;
 
 /* ---- FILE PARSERS ---- */
 function section(md, ...headings) {
@@ -805,7 +811,7 @@ function renderExecute(){
     return`<div style="${border}"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar-sm ${c.av}">${c.initials}</div><div style="flex:1;"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role}</div></div><button class="send-btn ${c.status==='draft'?'draft':''}">${c.status==='draft'?'Draft':'Send'}</button></div>${msgHtml}</div>`;
   }).join('');
   const hits=data.tenX.map((t,i)=>({...t,_i:i})).filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row" onclick="toggleTenX(${t._i})"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
-  return`${modeHero('execute')}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;
+  return`${modeHero('execute')}${batchQueueAlert()?`<div style="margin-top:4px;">${batchQueueAlert()}</div>`:''}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;
 }
 function renderWrap(){const w=data.wrap;const stats=w.stats.map(s=>`<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');const refl=w.reflection.map(r=>`<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');const tmrw=w.tomorrow.map((t,i)=>`<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');return`${modeHero('wrap')}<div class="day-score-card"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;"><div><div class="section-label" style="color:var(--dark-text-3);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--dark-text-2);">%</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div></div><div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint-bg);border-radius:999px;height:6px;width:${w.score}%;"></div></div></div><div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Tomorrow's Top 3</div>${tmrw}</div><div style="padding:0 24px 20px;"><div class="wrap-cta"><div><div class="wrap-cta-title">Run End-of-Day Wrap</div><div class="wrap-cta-sub">Stone stages tomorrow's brief</div></div><div class="wrap-icon">${arr()}</div></div></div>`;}
 
@@ -881,10 +887,15 @@ function renderDay(){
 
   return`<div class="faith-anchor">${data.faithAnchor}</div><div class="section"><div class="section-label">Schedule</div>${sched}</div><div class="section"><div class="section-label">10x Items</div>${tenx}</div>${qhHtml}${maskHtml}<div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div>`;
 }
+function batchQueueAlert(){
+  const bq=data.batchQueue;
+  if(!bq) return '';
+  return`<div style="margin:0 24px 16px;background:var(--amber-bg,rgba(251,191,36,0.12));border:1px solid var(--amber,#F59E0B);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="var(--amber-text,#B45309)" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="var(--amber-text,#B45309)" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="var(--amber-text,#B45309)" stroke-width="2.5" stroke-linecap="round"/></svg><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:var(--amber-text,#B45309);line-height:1.3;">${bq.count} first-touch contacts due ${bq.label}</div><div style="font-size:12px;color:var(--amber-text,#B45309);margin-top:3px;opacity:0.85;">Dio needs to batch-draft these — tell Stone to run it now.</div></div></div>`;
+}
 function renderPeople(){
   const overdue=data.contacts.filter(c=>c.status==='overdue'),priority=data.contacts.filter(c=>c.status!=='overdue');
-  const row=c=>`<div class="contact-row"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;
-  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div><div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
+  const row=c=>{const idx=data.contacts.indexOf(c);return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
+  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div>${batchQueueAlert()}<div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
 }
 function renderProjects(){
   const cards=data.projects.map(p=>`<div class="project-card"><div class="proj-header"><div><div class="proj-name">${p.name}</div><div class="proj-sub">${p.sub}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${statusBadge(p.status)}<span class="badge ${p.pri==='H'?'pri-h':p.pri==='M'?'pri-m':'pri-l'}">${p.pri}</span></div></div><div class="proj-next"><span class="proj-next-label ${p.blocked?'blocked':''}">${p.blocked?'Blocked':'Next'} → </span>${p.next}</div></div>`).join('');
@@ -1033,11 +1044,14 @@ async function fetchFromGitHub(dateStr) {
   try {
     const r = await fetch('/api/contacts');
     if (r.ok) {
-      const contacts = await r.json();
-      if (contacts && contacts.length) {
+      const payload = await r.json();
+      const contacts = Array.isArray(payload) ? payload : (payload.contacts || []);
+      const batchQueue = Array.isArray(payload) ? null : (payload.batchQueue || null);
+      if (contacts.length) {
         data.contacts = contacts;
         data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
       }
+      data.batchQueue = batchQueue;
     }
   } catch {}
   if (isLocalServer) await fetchProjects();
@@ -1202,6 +1216,47 @@ async function toggleTenX(i) {
     } catch {}
   }
 }
+
+/* ---- CONTACT DETAIL ---- */
+function showContactDetail(c) {
+  const body = document.getElementById('contact-sheet-body');
+  const sheet = document.getElementById('contact-sheet');
+  const overlay = document.getElementById('contact-sheet-overlay');
+  if (!body || !sheet) return;
+  const statusColors = { overdue: 'var(--red-text)', send: 'var(--mint-text)', active: 'var(--text-3)' };
+  const statusLabels = { overdue: 'Overdue', send: 'Priority', active: 'Active' };
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+      <div class="contact-avatar ${c.av}" style="width:48px;height:48px;font-size:16px;flex-shrink:0;">${c.initials}</div>
+      <div style="flex:1;">
+        <div style="font-size:18px;font-weight:700;color:var(--text);line-height:1.2;">${c.name}</div>
+        ${c.role ? `<div style="font-size:13px;color:var(--text-3);margin-top:2px;">${c.role}</div>` : ''}
+      </div>
+      <span style="font-size:12px;font-weight:600;color:${statusColors[c.status]||'var(--text-3)'};">${statusLabels[c.status]||''}</span>
+    </div>
+    ${c.lastTouch ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Last Touch</div><div style="font-size:14px;color:var(--text-2);line-height:1.5;">${c.lastTouch}</div></div>` : ''}
+    ${c.action ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Next Action</div><div style="font-size:14px;color:var(--text);line-height:1.5;">${c.action}</div></div>` : ''}
+    ${c.time ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Due</div><div style="font-size:14px;color:${c.status==='overdue'?'var(--red-text)':'var(--text-2)'};">${c.time}</div></div>` : ''}
+    ${c.notes ? `<div style="margin-bottom:4px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Notes</div><div style="font-size:13px;color:var(--text-3);line-height:1.6;">${c.notes}</div></div>` : ''}
+  `;
+  overlay.style.display = 'block';
+  requestAnimationFrame(() => { sheet.style.transform = 'translateY(0)'; });
+}
+function closeContactDetail() {
+  const sheet = document.getElementById('contact-sheet');
+  const overlay = document.getElementById('contact-sheet-overlay');
+  if (sheet) sheet.style.transform = 'translateY(100%)';
+  if (overlay) overlay.style.display = 'none';
+}
+(function initSheetSwipe() {
+  const sheet = document.getElementById('contact-sheet');
+  if (!sheet) return;
+  let startY = 0;
+  sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+  sheet.addEventListener('touchend', e => {
+    if (e.changedTouches[0].clientY - startY > 60) closeContactDetail();
+  }, { passive: true });
+})();
 
 /* ---- REFRESH ---- */
 let lastFetchTime = 0;
