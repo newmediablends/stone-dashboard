@@ -8,9 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="Stone">
   <title>Stone</title>
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" sizes="180x180" href="icon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <link rel="shortcut icon" href="icon.svg">
   <meta name="theme-color" content="#0C2818">
+  <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
@@ -82,8 +83,10 @@
     }
 
     html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'DM Sans', system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; transition: background 0.2s, color 0.2s; }
+    @media (min-width: 500px) { body { background: var(--bg-surface); } }
 
     #app { display: flex; flex-direction: column; height: 100%; max-width: 430px; margin: 0 auto; position: relative; }
+    @media (min-width: 500px) { #app { box-shadow: 0 0 0 1px var(--border), 0 8px 40px rgba(0,0,0,0.18); border-radius: 24px; overflow: hidden; height: calc(100% - 32px); margin-top: 16px; } }
 
     .status-bar { height: env(safe-area-inset-top, 44px); min-height: 20px; flex-shrink: 0; }
 
@@ -124,6 +127,21 @@
     .mode-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .mode-label { font-size: 13px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
     .mode-headline { font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; color: var(--text); line-height: 34px; }
+
+    /* ---- MODE PICKER ---- */
+    .mode-badge-btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 12px; border-radius: 999px; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; margin-bottom: 12px; position: relative; }
+    .mode-picker-wrap { position: relative; display: inline-block; }
+    .mode-picker-panel { position: absolute; top: calc(100% + 6px); left: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,0.14); z-index: 200; min-width: 230px; }
+    .mode-picker-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.1s; }
+    .mode-picker-row:active { background: var(--bg-surface); }
+    .mode-picker-row.is-live { background: var(--mint-bg); }
+    .mode-picker-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .mode-picker-label { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; flex: 1; }
+    .mode-live-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: var(--mint-text); color: #fff; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+    .mode-check { flex-shrink: 0; }
+
+    /* ---- BACK TO LIVE ---- */
+    .back-to-live { background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--amber-text); padding: 4px 0 10px; }
 
     .badge { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
     .bg-green   { background: var(--mint-bg);    color: var(--mint-text);   }
@@ -193,7 +211,8 @@
     .sched-energy span { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
     .now-badge { background: var(--mint-bg); color: var(--mint-text); font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.04em; }
 
-    .tenx-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .tenx-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .tenx-row:active { opacity: 0.65; }
     .checkbox { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
     .checkbox.pri  { border-color: var(--green-btn); }
     .checkbox.done { background: var(--green-btn); border-color: var(--green-btn); }
@@ -270,7 +289,10 @@
     .day-nav-btn:disabled { opacity:0.25; cursor:default; }
     .day-label { font-size:13px; font-weight:600; color:var(--text-2); letter-spacing:.02em; min-width:148px; text-align:center; user-select:none; }
     .day-label.past { color:var(--amber); }
+    @keyframes ptr-spin { to { transform: rotate(360deg); } }
+    #ptr-svg.spinning { animation: ptr-spin 0.7s linear infinite; }
   </style>
+  <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </head>
 <body>
 <div id="app">
@@ -306,6 +328,7 @@
     <button class="tab-pill" data-tab="people">People</button>
     <button class="tab-pill" data-tab="projects">Projects</button>
   </div>
+  <div id="ptr-indicator" style="position:absolute;left:0;right:0;display:flex;justify-content:center;padding:6px 0;opacity:0;pointer-events:none;z-index:50;transition:opacity 0.15s;"><svg id="ptr-svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="var(--mint-text)" stroke-width="2" stroke-linecap="round"/></svg></div>
   <div class="content" id="content"></div>
   <div class="mic-bar" id="mic-bar" style="display:none;">
     <div class="mic-inner">
@@ -531,22 +554,55 @@ function parseDailyNote(md) {
 }
 
 function parseNetworkTracker(md) {
-  const rows = [...md.matchAll(/\|\s*([A-Z][^\|]{2,30})\s*\|\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|/g)].slice(2);
-  if (!rows.length) return null;
-  const statusMap = s => {
-    s = s.toLowerCase().trim();
-    if (s.includes('overdue'))  return { status:'overdue', av:'av-red'   };
-    if (s.includes('send'))     return { status:'send',    av:'av-green' };
-    if (s.includes('draft'))    return { status:'draft',   av:'av-gray'  };
-    if (s.includes('waiting'))  return { status:'waiting', av:'av-gray'  };
-    return { status:'active', av:'av-gray' };
-  };
-  return rows.slice(0,8).map(r => {
-    const name = r[1].trim();
-    const initials = name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
-    const { status, av } = statusMap(r[4]);
-    return { initials, name, role: r[2].trim(), action: r[3].trim(), status, time: r[5].trim(), av };
-  });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const results = [];
+  let hdr = null;
+
+  for (const line of md.split('\n')) {
+    if (!line.includes('|')) continue;
+    const parts = line.split('|');
+    const cells = parts.slice(1, parts.length - 1).map(c => c.trim());
+    if (!cells.length) continue;
+    if (cells.every(c => /^-*$/.test(c))) continue;
+
+    const lower = cells.map(c => c.toLowerCase());
+    if (lower[0] === 'name' && lower.some(c => c === 'status')) {
+      hdr = {
+        name:    0,
+        company: lower.indexOf('company'),
+        status:  lower.indexOf('status'),
+        action:  lower.findIndex(c => c.includes('next action')),
+        due:     lower.indexOf('due'),
+      };
+      continue;
+    }
+
+    if (!hdr) continue;
+    const name = cells[hdr.name] || '';
+    if (!name || /^[-–—]+$/.test(name)) continue;
+    if (hdr.status >= 0 && cells.length <= hdr.status) continue;
+
+    const company   = hdr.company >= 0 ? cells[hdr.company] || '' : '';
+    const rawStatus = hdr.status  >= 0 ? cells[hdr.status]  || '' : '';
+    const action    = hdr.action  >= 0 && hdr.action  < cells.length ? cells[hdr.action]  || '' : '';
+    const due       = hdr.due     >= 0 && hdr.due     < cells.length ? cells[hdr.due]     || '' : '';
+
+    const initials = name.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+    const sl = rawStatus.toLowerCase();
+    const dm = due.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const dueDate = dm ? new Date(+dm[3], +dm[1]-1, +dm[2]) : null;
+    const isPastDue = dueDate && dueDate < today;
+
+    let status, av;
+    if (isPastDue)                 { status = 'overdue'; av = 'av-red';   }
+    else if (sl.includes('priority')) { status = 'send';    av = 'av-green'; }
+    else                           { status = 'active';  av = 'av-gray';  }
+
+    results.push({ initials, name, role: company, action, status, time: due, av });
+  }
+
+  results.sort((a,b) => ({overdue:0,send:1,active:2}[a.status]||2) - ({overdue:0,send:1,active:2}[b.status]||2));
+  return results.length ? results.slice(0,8) : null;
 }
 
 async function scanProjects(dir) {
@@ -609,7 +665,10 @@ async function loadRealData(dir, dateStr) {
       if (tracker) {
         const txt = await (await tracker.getFile()).text();
         const contacts = parseNetworkTracker(txt);
-        if (contacts && contacts.length) data.contacts = contacts;
+        if (contacts && contacts.length) {
+          data.contacts = contacts;
+          data.outreach = contacts.map(c => ({...c, msg:''}));
+        }
       }
     }
   } catch (e) { console.warn('Network Tracker:', e); }
@@ -635,16 +694,78 @@ function getMode() {
   return 'wrap';
 }
 const modeCfg = {
-  prime:   {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PRIME MODE · 5–9AM',        headline:'Ground. Intend. Begin.'      },
-  peak:    {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PEAK MODE · 9–11AM',         headline:'Lock in. Go deep.'           },
-  rebuild: {dot:'var(--amber)',     color:'var(--amber)',     label:'REBUILD MODE · 11:30AM–2PM', headline:'Recharge. Connect. Prepare.' },
-  execute: {dot:'var(--green-btn)', color:'var(--mint-text)', label:'EXECUTE MODE · 2–6PM',       headline:'Send. Follow up. Close.'     },
-  wrap:    {dot:'var(--text-4)',    color:'var(--text-4)',    label:'WRAP MODE · EVENING',        headline:'Reflect. Reset. Rest.'       },
+  prime:   {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PRIME MODE · 5–9AM',        headline:'Ground. Intend. Begin.',      bg:'#1A4731', fg:'#FFFFFF'},
+  peak:    {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PEAK MODE · 9–11AM',         headline:'Lock in. Go deep.',           bg:'#1A4731', fg:'#FFFFFF'},
+  rebuild: {dot:'var(--amber)',     color:'var(--amber)',     label:'REBUILD MODE · 11:30AM–2PM', headline:'Recharge. Connect. Prepare.', bg:'#92400E', fg:'#FFFFFF'},
+  execute: {dot:'var(--green-btn)', color:'var(--mint-text)', label:'EXECUTE MODE · 2–6PM',       headline:'Send. Follow up. Close.',     bg:'#1A4731', fg:'#FFFFFF'},
+  wrap:    {dot:'var(--text-4)',    color:'var(--text-4)',    label:'WRAP MODE · EVENING',        headline:'Reflect. Reset. Rest.',       bg:'#374151', fg:'#FFFFFF'},
 };
+let manualMode = null;
+let pickerOpen = false;
+
 function modeHero(m) {
   const c = modeCfg[m];
-  return `<div style="padding:0 24px 16px;"><div class="mode-badge"><div class="mode-dot" style="background:${c.dot}"></div><span class="mode-label" style="color:${c.color}">${c.label}</span></div><div class="mode-headline">${c.headline}</div></div>`;
+  const live = getMode();
+  const isLive = m === live && !manualMode;
+  const chevronPath = pickerOpen
+    ? 'M18 15l-6-6-6 6'
+    : 'M6 9l6 6 6-6';
+  const chevron = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="${chevronPath}" stroke="${c.fg}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  const rows = Object.entries(modeCfg).map(([key, cfg]) => {
+    const isThisLive = key === live;
+    const isSelected = key === m;
+    return `<div class="mode-picker-row${isThisLive ? ' is-live' : ''}" onclick="selectMode('${key}')">
+      <div class="mode-picker-dot" style="background:${cfg.dot}"></div>
+      <span class="mode-picker-label" style="color:${cfg.color}">${cfg.label}</span>
+      ${isThisLive ? `<span class="mode-live-tag">LIVE</span>` : ''}
+      ${isSelected && !isThisLive ? `<svg class="mode-check" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--mint-text)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}
+    </div>`;
+  }).join('');
+
+  const panel = pickerOpen
+    ? `<div class="mode-picker-panel" id="mode-picker-panel">${rows}</div>`
+    : '';
+
+  const liveBadge = isLive
+    ? `<span style="font-size:10px;font-weight:700;letter-spacing:0.08em;background:rgba(255,255,255,0.25);color:${c.fg};padding:2px 8px;border-radius:999px;flex-shrink:0;">LIVE</span>`
+    : '';
+
+  const backToLive = manualMode
+    ? `<button class="back-to-live" onclick="goLive()">↩ Back to live</button>`
+    : '';
+
+  return `<div style="padding:0 24px 16px;">
+    <div class="mode-picker-wrap">
+      <button class="mode-badge-btn" style="background:${c.bg};" onclick="toggleModePicker(event)" aria-expanded="${pickerOpen}" aria-haspopup="listbox">
+        <div class="mode-dot" style="background:rgba(255,255,255,0.6)"></div>
+        <span class="mode-label" style="color:${c.fg}">${c.label}</span>
+        ${liveBadge}
+        ${chevron}
+      </button>
+      ${panel}
+    </div>
+    ${backToLive}
+    <div class="mode-headline">${c.headline}</div>
+  </div>`;
 }
+
+function toggleModePicker(e) {
+  e.stopPropagation();
+  pickerOpen = !pickerOpen;
+  render(activeTab);
+}
+function selectMode(key) {
+  manualMode = key === getMode() ? null : key;
+  pickerOpen = false;
+  render(activeTab);
+}
+function goLive() {
+  manualMode = null;
+  pickerOpen = false;
+  render(activeTab);
+}
+function updateLiveChip() { /* inline in modeHero now */ }
 
 /* ---- HELPERS ---- */
 const chk = () => `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -674,7 +795,7 @@ function renderPrime() {
     <div style="padding:0 24px 20px;"><div class="section-label">Next Up</div>${nxt}</div>`;
 }
 function getPeakTime(){const now=new Date(),end=new Date(now);end.setHours(11,0,0,0);const d=Math.max(0,end-now),h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000),s=Math.floor((d%60000)/1000);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;}
-function renderPeak(){const top=data.tenX.find(t=>!t.done&&t.pri)||data.tenX.find(t=>!t.done);const rows=data.tenX.map(t=>`<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');return`${modeHero('peak')}<div class="focus-block"><div class="countdown" id="countdown">${getPeakTime()}</div><div class="countdown-label">remaining in peak window</div><div class="focus-priority"><div class="fp-label">Top Priority</div><div class="fp-text">${top?top.label:'All 10x done'}</div></div></div><div style="padding:0 24px 20px;"><div class="section-label">10x Items</div>${rows}</div>`;}
+function renderPeak(){const top=data.tenX.find(t=>!t.done&&t.pri)||data.tenX.find(t=>!t.done);const rows=data.tenX.map((t,i)=>`<div class="tenx-row" onclick="toggleTenX(${i})"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');return`${modeHero('peak')}<div class="focus-block"><div class="countdown" id="countdown">${getPeakTime()}</div><div class="countdown-label">remaining in peak window</div><div class="focus-priority"><div class="fp-label">Top Priority</div><div class="fp-text">${top?top.label:'All 10x done'}</div></div></div><div style="padding:0 24px 20px;"><div class="section-label">10x Items</div>${rows}</div>`;}
 function renderRebuild(){const done=data.tenX.filter(t=>t.done).length,total=data.tenX.length,pct=total?Math.round(done/total*100):0;const contacts=data.contacts.filter(c=>c.status==='overdue'||c.status==='send').slice(0,3).map(c=>`<div class="contact-row"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}</div></div>`).join('');return`${modeHero('rebuild')}<div class="progress-card"><div style="display:flex;justify-content:space-between;align-items:center;"><span class="section-label" style="color:var(--amber);margin:0;">Day Progress</span><span style="font-size:13px;font-weight:700;color:var(--amber-text);">${done} of ${total} done</span></div><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><span style="font-size:12px;color:var(--amber-text);">Keep pushing through rebuild window</span></div><div style="padding:0 24px 20px;"><div class="section-label">Who to Reach</div>${contacts}</div>`;}
 function renderExecute(){
   const q=data.outreach.map((c,i)=>{
@@ -683,7 +804,7 @@ function renderExecute(){
       :`<div style="font-size:12px;color:var(--text-4);margin-top:6px;font-style:italic;">${c.action}</div>`;
     return`<div style="${border}"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar-sm ${c.av}">${c.initials}</div><div style="flex:1;"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role}</div></div><button class="send-btn ${c.status==='draft'?'draft':''}">${c.status==='draft'?'Draft':'Send'}</button></div>${msgHtml}</div>`;
   }).join('');
-  const hits=data.tenX.filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
+  const hits=data.tenX.map((t,i)=>({...t,_i:i})).filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row" onclick="toggleTenX(${t._i})"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
   return`${modeHero('execute')}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;
 }
 function renderWrap(){const w=data.wrap;const stats=w.stats.map(s=>`<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');const refl=w.reflection.map(r=>`<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');const tmrw=w.tomorrow.map((t,i)=>`<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');return`${modeHero('wrap')}<div class="day-score-card"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;"><div><div class="section-label" style="color:var(--dark-text-3);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--dark-text-2);">%</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div></div><div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint-bg);border-radius:999px;height:6px;width:${w.score}%;"></div></div></div><div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Tomorrow's Top 3</div>${tmrw}</div><div style="padding:0 24px 20px;"><div class="wrap-cta"><div><div class="wrap-cta-title">Run End-of-Day Wrap</div><div class="wrap-cta-sub">Stone stages tomorrow's brief</div></div><div class="wrap-icon">${arr()}</div></div></div>`;}
@@ -734,7 +855,7 @@ function renderDay(){
       </div>
     </div>`;
   }).join('');
-  const tenx=data.tenX.map(t=>`<div class="tenx-row"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
+  const tenx=data.tenX.map((t,i)=>`<div class="tenx-row" onclick="toggleTenX(${i})"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
   const log=data.log.length?data.log.map(l=>`<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-text">${l.entry}</span></div>`).join(''):`<div style="font-size:14px;color:var(--text-4);font-style:italic;">No entries yet. Narrate your day.</div>`;
 
   const qhHtml = data.quickHits && data.quickHits.length
@@ -812,7 +933,7 @@ function render(tab) {
   clearInterval(countdownTimer);
   let html='';
   if (tab==='home') {
-    const mode=getMode();
+    const mode = manualMode || getMode();
     if (mode==='prime')        html=renderPrime();
     else if (mode==='peak')  { html=renderPeak(); countdownTimer=setInterval(()=>{const el=document.getElementById('countdown');if(el)el.textContent=getPeakTime();else clearInterval(countdownTimer);},1000); }
     else if (mode==='rebuild') html=renderRebuild();
@@ -824,11 +945,19 @@ function render(tab) {
   const content=document.getElementById('content');
   content.innerHTML=html;
   content.scrollTop=0;
+  updateLiveChip();
 }
 
 document.getElementById('tab-bar').addEventListener('click', e=>{
   const p=e.target.closest('.tab-pill');
   if(p) render(p.dataset.tab);
+});
+
+document.addEventListener('click', e => {
+  if (pickerOpen && !e.target.closest('.mode-picker-wrap')) {
+    pickerOpen = false;
+    render(activeTab);
+  }
 });
 
 /* ---- DATE NAVIGATION ---- */
@@ -902,11 +1031,13 @@ async function fetchFromGitHub(dateStr) {
     }
   } catch {}
   try {
-    const r = await fetch('daily/Network-Tracker.md');
+    const r = await fetch('/api/contacts');
     if (r.ok) {
-      const txt = await r.text();
-      const contacts = parseNetworkTracker(txt);
-      if (contacts && contacts.length) data.contacts = contacts;
+      const contacts = await r.json();
+      if (contacts && contacts.length) {
+        data.contacts = contacts;
+        data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
+      }
     }
   } catch {}
   if (isLocalServer) await fetchProjects();
@@ -1052,6 +1183,94 @@ async function saveMaskEdit(letter) {
   }, 50);
 }
 
+/* ---- 10X TOGGLE ---- */
+async function toggleTenX(i) {
+  if (!data.tenX || !data.tenX[i]) return;
+  data.tenX[i].done = !data.tenX[i].done;
+  data.tenX.forEach(t => t.pri = false);
+  const first = data.tenX.find(t => !t.done);
+  if (first) first.pri = true;
+  if (navigator.vibrate) navigator.vibrate(8);
+  render(activeTab);
+  if (isLocalServer && isToday(currentDate)) {
+    try {
+      await fetch('/daily/tenx', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({date: formatDate(currentDate), index: i, done: data.tenX[i].done})
+      });
+    } catch {}
+  }
+}
+
+/* ---- REFRESH ---- */
+let lastFetchTime = 0;
+
+function timeSince(ms) {
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 90) return 'just now';
+  const m = Math.floor(s / 60);
+  return m === 1 ? '1 min ago' : `${m} min ago`;
+}
+
+function updateConnectedNote() {
+  const el = document.getElementById('connected-note');
+  if (!el || !lastFetchTime || el.style.display === 'none') return;
+  el.textContent = `Live · ${timeSince(lastFetchTime)} · r4`;
+}
+
+let isRefreshing = false;
+async function doRefresh() {
+  if (isRefreshing || document.hidden) return;
+  isRefreshing = true;
+  const ptr = document.getElementById('ptr-indicator');
+  if (ptr) { ptr.style.opacity = '1'; ptr.querySelector('svg').classList.add('spinning'); }
+  try {
+    const r = await fetch(`/daily/${formatDate(currentDate)}.md?_t=${Date.now()}`);
+    if (r.ok) {
+      const txt = await r.text();
+      const parsed = parseDailyNote(txt);
+      if (parsed.tenX)        data.tenX        = parsed.tenX;
+      if (parsed.log)         data.log         = parsed.log;
+      if (parsed.quickHits)   data.quickHits   = parsed.quickHits;
+      if (parsed.maskJournal) data.maskJournal = parsed.maskJournal;
+      lastFetchTime = Date.now();
+      updateConnectedNote();
+      if (!document.querySelector('[data-editing]') && document.activeElement !== document.getElementById('mic-input')) {
+        render(activeTab);
+      }
+    }
+  } catch {}
+  if (ptr) { ptr.style.opacity = '0'; ptr.querySelector('svg').classList.remove('spinning'); }
+  isRefreshing = false;
+}
+
+function initPullToRefresh() {
+  const el = document.getElementById('content');
+  if (!el) return;
+  let startY = 0, pulling = false;
+  const ptr = document.getElementById('ptr-indicator');
+  el.addEventListener('touchstart', e => {
+    if (el.scrollTop === 0) { startY = e.touches[0].clientY; pulling = true; }
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 10 && ptr) ptr.style.opacity = Math.min(dy / 80, 1).toFixed(2);
+  }, { passive: true });
+  el.addEventListener('touchend', e => {
+    if (!pulling) return;
+    pulling = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (ptr) ptr.style.opacity = '0';
+    if (dy > 64) doRefresh();
+  }, { passive: true });
+}
+
+function startPolling() {
+  setInterval(updateConnectedNote, 30_000);
+}
+
 /* ---- INIT ---- */
 const hasFileAccess = typeof window.showDirectoryPicker === 'function';
 const isLocalServer = ['localhost','127.0.0.1'].includes(location.hostname)
@@ -1060,12 +1279,13 @@ const isLocalServer = ['localhost','127.0.0.1'].includes(location.hostname)
 
 async function init() {
   if (isLocalServer) {
-    // Running from local server — fetch live files directly, no connect step
     showAppShell();
-    const note = document.getElementById('connected-note');
-    note.style.display = 'block';
-    note.textContent = 'Live · reading from Second Brain';
+    document.getElementById('connected-note').style.display = 'block';
     await fetchFromGitHub(formatDate(currentDate));
+    lastFetchTime = Date.now();
+    updateConnectedNote();
+    startPolling();
+    initPullToRefresh();
     render('home');
     return;
   }
