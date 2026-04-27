@@ -107,10 +107,12 @@
 
     .mic-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 24px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px)); background: var(--bg); border-top: 1px solid var(--border-light); }
     .mic-inner { display: flex; align-items: center; gap: 12px; background: var(--bg-surface); border: 1px solid var(--mic-border); border-radius: 14px; padding: 14px 16px; }
-    .mic-text { flex: 1; font-size: 16px; color: var(--text); border: none; background: transparent; outline: none; font-family: inherit; }
+    .mic-text { flex: 1; font-size: 16px; color: var(--text); border: none; background: transparent; outline: none; font-family: inherit; transition: color 0.1s; }
     .mic-text::placeholder { color: var(--text-4); }
+    .mic-text.interim { color: var(--text-3); font-style: italic; }
     .mic-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--green-btn); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; -webkit-tap-highlight-color: transparent; }
-    .mic-btn.listening { background: var(--red); }
+    .mic-btn.listening { background: var(--red); animation: mic-pulse 1.4s ease infinite; }
+    @keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.45); } 60% { box-shadow: 0 0 0 7px rgba(239,68,68,0); } }
 
     /* ---- CONNECT SCREEN ---- */
     .connect-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 32px; text-align: center; gap: 24px; flex: 1; }
@@ -1098,29 +1100,54 @@ async function loadAndRender(dir) {
 /* ---- NARRATION ---- */
 const micInput=document.getElementById('mic-input'),micBtn=document.getElementById('mic-btn');
 let SR=null,listening=false;
-const speechSupported=('webkitSpeechRecognition' in window||'SpeechRecognition' in window) && (location.protocol==='https:' || location.hostname==='localhost');
+const speechSupported=('webkitSpeechRecognition' in window||'SpeechRecognition' in window) && (location.protocol==='https:'||location.hostname==='localhost');
 if(speechSupported){
-  const C=window.SpeechRecognition||window.webkitSpeechRecognition;SR=new C();SR.continuous=false;SR.interimResults=false;SR.lang='en-US';
-  SR.onresult=e=>{micInput.value=e.results[0][0].transcript;};
-  SR.onend=()=>{listening=false;micBtn.classList.remove('listening');if(micInput.value.trim())submitLog();};
-  SR.onerror=()=>{listening=false;micBtn.classList.remove('listening');};
+  const C=window.SpeechRecognition||window.webkitSpeechRecognition;
+  SR=new C();
+  SR.continuous=true;
+  SR.interimResults=true;
+  SR.lang='en-US';
+  SR.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal){
+        const t=e.results[i][0].transcript.trim();
+        if(t){micInput.value='';micInput.classList.remove('interim');submitLogEntry(t);}
+      } else {
+        interim+=e.results[i][0].transcript;
+      }
+    }
+    if(interim){micInput.value=interim;micInput.classList.add('interim');}
+  };
+  SR.onend=()=>{
+    micInput.classList.remove('interim');
+    if(listening){try{SR.start();}catch(err){listening=false;micBtn.classList.remove('listening');}}
+  };
+  SR.onerror=e=>{
+    if(e.error==='no-speech')return;
+    listening=false;micBtn.classList.remove('listening');micInput.classList.remove('interim');
+  };
 } else {
   micBtn.title='Voice requires HTTPS — type your note and press Enter';
   micBtn.style.opacity='0.4';
 }
 micBtn.addEventListener('click',()=>{
   if(!SR){micInput.focus();return;}
-  if(!listening){listening=true;micBtn.classList.add('listening');try{SR.start();}catch(e){listening=false;micBtn.classList.remove('listening');}}
-  else SR.stop();
+  if(!listening){
+    listening=true;micBtn.classList.add('listening');
+    try{SR.start();}catch(e){listening=false;micBtn.classList.remove('listening');}
+  } else {
+    listening=false;micBtn.classList.remove('listening');micInput.classList.remove('interim');
+    try{SR.stop();}catch(e){}
+    if(micInput.value.trim()){submitLogEntry(micInput.value.trim());micInput.value='';}
+  }
 });
-micInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&micInput.value.trim())submitLog();});
-async function submitLog(){
-  const text=micInput.value.trim();
+micInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&micInput.value.trim()){const t=micInput.value.trim();micInput.value='';micInput.classList.remove('interim');submitLogEntry(t);}});
+async function submitLogEntry(text){
   if(!text)return;
   const now=new Date();
   const timeStr=`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
   data.log.push({time:timeStr,entry:text});
-  micInput.value='';
   if(activeTab==='home'||activeTab==='day')render(activeTab);
   if(isLocalServer && isToday(currentDate)){
     try{
