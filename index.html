@@ -696,19 +696,11 @@ async function loadRealData(dir, dateStr) {
   } catch (e) { console.warn('Daily note:', e); }
 
   try {
-    // Try both known locations for Network-Tracker.md
-    let trackerFile = null;
-    const projDir1 = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
-    if (projDir1) {
-      const jobDir = await projDir1.getDirectoryHandle('Job Search — VP or CPO Role').catch(()=>null);
-      if (jobDir) trackerFile = await jobDir.getFileHandle('Network-Tracker.md').catch(()=>null);
-    }
-    if (!trackerFile) {
-      const resDir = await dir.getDirectoryHandle('3-Resources').catch(()=>null);
-      if (resDir) trackerFile = await resDir.getFileHandle('Network-Tracker.md').catch(()=>null);
-    }
-    if (trackerFile) {
-      const txt = await (await trackerFile.getFile()).text();
+    const projDir = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
+    const jobDir  = projDir && await projDir.getDirectoryHandle('Job Search — VP or CPO Role').catch(()=>null);
+    const tracker = jobDir  && await jobDir.getFileHandle('Network-Tracker.md').catch(()=>null);
+    if (tracker) {
+      const txt = await (await tracker.getFile()).text();
       const contacts = parseNetworkTracker(txt);
       if (contacts && contacts.length) {
         data.contacts = contacts;
