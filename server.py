@@ -102,7 +102,11 @@ def parse_contacts(max_rows=12):
                 except Exception:
                     pass
         contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
-        return {"contacts": contacts[:max_rows], "batchQueue": data.get("batchQueue"), "focusToday": data.get("focusToday", [])}
+        focus_names = {c.lower() for c in data.get("focusToday", [])}
+        sliced = contacts[:max_rows]
+        in_slice = {c["name"].lower() for c in sliced}
+        extras = [c for c in contacts[max_rows:] if c["name"].lower() in focus_names and c["name"].lower() not in in_slice]
+        return {"contacts": sliced + extras, "batchQueue": data.get("batchQueue"), "focusToday": data.get("focusToday", [])}
     except Exception:
         return {"contacts": [], "batchQueue": None, "focusToday": []}
 
