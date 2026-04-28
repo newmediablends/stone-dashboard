@@ -25,13 +25,31 @@ done < <(find "$BRAIN/Daily" -name "*.md" -print0 2>/dev/null)
 echo "  $COUNT daily notes synced"
 
 # ---- Network Tracker ----
-TRACKER="$BRAIN/3-Resources/Network-Tracker.md"
+TRACKER="$BRAIN/1-Projects/Job Search — VP or CPO Role/Network-Tracker.md"
 if [ -f "$TRACKER" ]; then
   cp "$TRACKER" "$DAILY_OUT/Network-Tracker.md"
   echo "  Network Tracker synced"
 else
   echo "  Network Tracker not found — skipping"
 fi
+
+# ---- Project Status files ----
+PROJECTS_OUT="$REPO/projects"
+mkdir -p "$PROJECTS_OUT"
+PROJ_COUNT=0
+PROJ_INDEX=""
+while IFS= read -r -d '' d; do
+  pname="$(basename "$d")"
+  status_file="$d/Status.md"
+  if [ -f "$status_file" ]; then
+    mkdir -p "$PROJECTS_OUT/$pname"
+    cp "$status_file" "$PROJECTS_OUT/$pname/Status.md"
+    PROJ_INDEX="$PROJ_INDEX$pname"$'\n'
+    PROJ_COUNT=$((PROJ_COUNT + 1))
+  fi
+done < <(find "$BRAIN/1-Projects" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+printf '%s' "$PROJ_INDEX" > "$PROJECTS_OUT/index.txt"
+echo "  $PROJ_COUNT project Status.md files synced"
 
 # ---- Commit and push ----
 cd "$REPO"

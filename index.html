@@ -696,16 +696,23 @@ async function loadRealData(dir, dateStr) {
   } catch (e) { console.warn('Daily note:', e); }
 
   try {
-    const resDir = await dir.getDirectoryHandle('3-Resources').catch(()=>null);
-    if (resDir) {
-      const tracker = await resDir.getFileHandle('Network-Tracker.md').catch(()=>null);
-      if (tracker) {
-        const txt = await (await tracker.getFile()).text();
-        const contacts = parseNetworkTracker(txt);
-        if (contacts && contacts.length) {
-          data.contacts = contacts;
-          data.outreach = contacts.map(c => ({...c, msg:''}));
-        }
+    // Try both known locations for Network-Tracker.md
+    let trackerFile = null;
+    const projDir1 = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
+    if (projDir1) {
+      const jobDir = await projDir1.getDirectoryHandle('Job Search — VP or CPO Role').catch(()=>null);
+      if (jobDir) trackerFile = await jobDir.getFileHandle('Network-Tracker.md').catch(()=>null);
+    }
+    if (!trackerFile) {
+      const resDir = await dir.getDirectoryHandle('3-Resources').catch(()=>null);
+      if (resDir) trackerFile = await resDir.getFileHandle('Network-Tracker.md').catch(()=>null);
+    }
+    if (trackerFile) {
+      const txt = await (await trackerFile.getFile()).text();
+      const contacts = parseNetworkTracker(txt);
+      if (contacts && contacts.length) {
+        data.contacts = contacts;
+        data.outreach = contacts.map(c => ({...c, msg:''}));
       }
     }
   } catch (e) { console.warn('Network Tracker:', e); }
@@ -1157,31 +1164,41 @@ function updateDateNav() {
 }
 
 async function fetchProjects() {
+  // Try local server first (/projects returns plain-text name list)
+  // Fall back to GitHub Pages static files (projects/index.txt)
+  let names = null;
+  let statusBase = '';
   try {
     const r = await fetch('/projects');
-    if (!r.ok) return;
-    const names = (await r.text()).split('\n').filter(Boolean);
-    const projects = [];
-    for (const name of names.slice(0, 10)) {
-      const proj = { name, sub:'', status:'active', pri:'M', next:'—', blocked:false };
-      try {
-        const sr = await fetch(`/projects/${encodeURIComponent(name)}/Status.md`);
-        if (sr.ok) {
-          const txt = await sr.text();
-          const statusM = txt.match(/\*\*Status[^:]*:\*\*\s*([^\n]+)/i);
-          const nextM   = txt.match(/\*\*Next[^:]*:\*\*\s*([^\n]+)/i);
-          const priM    = txt.match(/\*\*Priority[^:]*:\*\*\s*([HML])/i);
-          const subM    = txt.match(/^>\s*(.{10,60})$/m) || txt.match(/^[A-Z][^#\n].{10,60}$/m);
-          if (statusM) { const s=statusM[1].toLowerCase(); proj.status=s.includes('block')?'blocked':s.includes('slow')?'slow':'active'; proj.blocked=proj.status==='blocked'; }
-          if (nextM)   proj.next = nextM[1].trim().substring(0,80);
-          if (priM)    proj.pri  = priM[1].toUpperCase();
-          if (subM)    proj.sub  = subM[1].trim().substring(0,45);
-        }
-      } catch {}
-      projects.push(proj);
-    }
-    if (projects.length) data.projects = projects;
+    if (r.ok) { names = (await r.text()).split('\n').filter(Boolean); statusBase = '/projects/'; }
   } catch {}
+  if (!names) {
+    try {
+      const r = await fetch('projects/index.txt');
+      if (r.ok) { names = (await r.text()).split('\n').filter(Boolean); statusBase = 'projects/'; }
+    } catch {}
+  }
+  if (!names || !names.length) return;
+  const projects = [];
+  for (const name of names.slice(0, 12)) {
+    const proj = { name, sub:'', status:'active', pri:'M', next:'—', blocked:false };
+    try {
+      const sr = await fetch(statusBase + encodeURIComponent(name) + '/Status.md');
+      if (sr.ok) {
+        const txt = await sr.text();
+        const statusM = txt.match(/\*\*Status[^:]*:\*\*\s*([^\n]+)/i);
+        const nextM   = txt.match(/\*\*Next[^:]*:\*\*\s*([^\n]+)/i);
+        const priM    = txt.match(/\*\*Priority[^:]*:\*\*\s*([HML])/i);
+        const subM    = txt.match(/^>\s*(.{10,60})$/m) || txt.match(/^[A-Z][^#\n].{10,60}$/m);
+        if (statusM) { const s=statusM[1].toLowerCase(); proj.status=s.includes('block')?'blocked':s.includes('slow')?'slow':'active'; proj.blocked=proj.status==='blocked'; }
+        if (nextM)   proj.next = nextM[1].trim().substring(0,80);
+        if (priM)    proj.pri  = priM[1].toUpperCase();
+        if (subM)    proj.sub  = subM[1].trim().substring(0,45);
+      }
+    } catch {}
+    projects.push(proj);
+  }
+  if (projects.length) data.projects = projects;
 }
 
 async function fetchFromGitHub(dateStr) {
@@ -1215,9 +1232,20 @@ async function fetchFromGitHub(dateStr) {
         data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
       }
       data.batchQueue = batchQueue;
+    } else {
+      // No local server — try synced Network Tracker snapshot (GitHub Pages)
+      const tr = await fetch('daily/Network-Tracker.md').catch(()=>null);
+      if (tr && tr.ok) {
+        const txt = await tr.text();
+        const contacts = parseNetworkTracker(txt);
+        if (contacts && contacts.length) {
+          data.contacts = contacts;
+          data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
+        }
+      }
     }
   } catch {}
-  if (isLocalServer) await fetchProjects();
+  await fetchProjects();
 }
 
 async function navigateDay(delta) {
