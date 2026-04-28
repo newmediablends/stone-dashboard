@@ -19,13 +19,21 @@ import ssl
 import subprocess
 from pathlib import Path
 
+
+def _cat(path, binary=False):
+    """Read a file via /bin/cat — triggers iCloud download-on-demand unlike raw open()."""
+    r = subprocess.run(["/bin/cat", str(path)], capture_output=True)
+    if r.returncode != 0:
+        raise PermissionError(f"cat failed (rc={r.returncode}): {r.stderr.decode()[:200]}")
+    return r.stdout if binary else r.stdout.decode("utf-8")
+
 BRAIN     = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/2-Areas/AI Second Brain"
 DASHBOARD = Path(__file__).parent
 PORT      = 3000
 
-DAILY_DIR = BRAIN / "Daily"
-TRACKER   = BRAIN / "1-Projects" / "Job Search — VP or CPO Role" / "Network-Tracker.md"
-PROJECTS  = BRAIN / "1-Projects"
+DAILY_DIR    = BRAIN / "Daily"
+CONTACTS_CACHE = DAILY_DIR / "contacts-cache.json"
+PROJECTS     = BRAIN / "1-Projects"
 CERT      = DASHBOARD / "cert.pem"
 KEY       = DASHBOARD / "key.pem"
 
@@ -53,6 +61,8 @@ def ensure_cert(ip):
         "-days", "825", "-nodes",
         "-subj", "/CN=Stone Dashboard",
         "-addext", f"subjectAltName=IP:{ip},IP:127.0.0.1,DNS:localhost",
+        "-addext", "basicConstraints=critical,CA:TRUE",
+        "-addext", "keyUsage=critical,keyCertSign,cRLSign,digitalSignature",
     ], check=True, capture_output=True)
     print(f"  Certificate saved to {CERT}")
     print()
@@ -66,104 +76,177 @@ def ensure_cert(ip):
     print("  ────────────────────────────────────────────────────────")
 
 
-# ── Network contacts parser ───────────────────────────────────────────────────
+# ── Network contacts (Notion-backed cache) ────────────────────────────────────
+# Source of truth: Notion Network Tracker (Data Source ID: cc5179f8-7c9d-4f04-bd77-b9e5ec48ee60)
+# Stone writes Daily/contacts-cache.json after every Notion contact update and at wrap.
+# server.py reads the cache — no Notion API key required.
 
 from datetime import date as _date
 
 def parse_contacts(max_rows=12):
     try:
-        txt = TRACKER.read_text(encoding="utf-8")
+        raw = _cat(CONTACTS_CACHE)
+        data = json.loads(raw)
+        contacts = data.get("contacts", [])
+        # Re-evaluate overdue status in case cache is from a previous day
+        today = _date.today()
+        for c in contacts:
+            due_str = c.get("time", "")
+            due_match = re.match(r"(\d{2})/(\d{2})/(\d{4})", due_str)
+            if due_match:
+                try:
+                    due_date = _date(int(due_match.group(3)), int(due_match.group(1)), int(due_match.group(2)))
+                    if due_date < today:
+                        c["status"] = "overdue"
+                        c["av"] = "av-red"
+                except Exception:
+                    pass
+        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
+        return {"contacts": contacts[:max_rows], "batchQueue": data.get("batchQueue")}
     except Exception:
         return {"contacts": [], "batchQueue": None}
-    today = _date.today()
-    results, hdr = [], None
-    in_queue_section = False
-    queue_count = 0
-    queue_earliest_due = None
 
-    for line in txt.split("\n"):
-        if line.startswith("## "):
-            in_queue_section = "priority import queue" in line.lower()
-            hdr = None
-            continue
-        if "|" not in line:
-            continue
-        parts = line.split("|")
-        cells = [c.strip() for c in parts[1:len(parts)-1]]
-        if not cells:
-            continue
-        if all(re.match(r"^-*$", c) for c in cells):
-            continue
-        lower = [c.lower() for c in cells]
-        if lower[0] == "name" and "status" in lower:
-            hdr = {
-                "name":    0,
-                "company": lower.index("company") if "company" in lower else -1,
-                "status":  lower.index("status"),
-                "action":  next((i for i, c in enumerate(lower) if "next action" in c), -1),
-                "due":     lower.index("due") if "due" in lower else -1,
-                "last_touch": next((i for i, c in enumerate(lower) if "last touch" in c), -1),
-                "notes":   lower.index("notes") if "notes" in lower else -1,
-            }
-            continue
-        if hdr is None:
-            continue
-        name = cells[hdr["name"]] if hdr["name"] < len(cells) else ""
-        if not name or re.match(r"^[-–—]+$", name):
-            continue
-        if hdr["status"] >= 0 and len(cells) <= hdr["status"]:
-            continue
-        raw_status = cells[hdr["status"]] if hdr["status"] < len(cells) else ""
-        action = cells[hdr["action"]] if hdr["action"] >= 0 and hdr["action"] < len(cells) else ""
-        due_str = cells[hdr["due"]] if hdr["due"] >= 0 and hdr["due"] < len(cells) else ""
-        company = cells[hdr["company"]] if hdr["company"] >= 0 and hdr["company"] < len(cells) else ""
-        last_touch = cells[hdr["last_touch"]] if hdr["last_touch"] >= 0 and hdr["last_touch"] < len(cells) else ""
-        notes = cells[hdr["notes"]] if hdr["notes"] >= 0 and hdr["notes"] < len(cells) else ""
-        initials = "".join(w[0] for w in name.split() if w)[:2].upper()
-        sl = raw_status.lower()
-        due_match = re.match(r"(\d{2})/(\d{2})/(\d{4})", due_str)
-        past_due = False
-        due_date = None
-        if due_match:
-            try:
-                due_date = _date(int(due_match.group(3)), int(due_match.group(1)), int(due_match.group(2)))
-                past_due = due_date < today
-            except Exception:
-                pass
-        if past_due:
-            status, av = "overdue", "av-red"
-        elif "priority" in sl:
-            status, av = "send", "av-green"
-        else:
-            status, av = "active", "av-gray"
 
-        if in_queue_section and due_date:
-            days_left = (due_date - today).days
-            if 0 <= days_left <= 3:
-                queue_count += 1
-                if queue_earliest_due is None or due_date < queue_earliest_due:
-                    queue_earliest_due = due_date
+# ── Home data (Day Score, reflection, tomorrow) ───────────────────────────────
 
-        results.append({
-            "initials": initials, "name": name, "role": company,
-            "action": action, "status": status, "time": due_str, "av": av,
-            "lastTouch": last_touch, "notes": notes,
-        })
+def parse_home_data(date_str):
+    note_path  = DAILY_DIR / f"{date_str}.md"
+    brief_path = DAILY_DIR / "Tomorrow-Brief.md"
 
-    results.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
+    tenx_done = 0
+    tenx_total = 0
+    outreach_sent = 0
+    win = ""
+    gap = ""
+    next_up = ""
+    tomorrow_items = []
+    txt = ""
 
-    batch_queue = None
-    if queue_count >= 10 and queue_earliest_due:
-        days_left = (queue_earliest_due - today).days
-        label = "today" if days_left == 0 else ("tomorrow" if days_left == 1 else f"in {days_left} days")
-        batch_queue = {
-            "count": queue_count,
-            "due": queue_earliest_due.strftime("%m/%d/%Y"),
-            "daysLeft": days_left,
-            "label": label,
-        }
+    if note_path.exists():
+        try:
+            txt = _cat(note_path)
+        except Exception:
+            txt = ""
 
-    return {"contacts": results[:max_rows], "batchQueue": batch_queue}
+        # ── 10x items (Section 2) ──────────────────────────────────────────────
+        sec2_m = re.search(r"##\s+Section 2[^\n]*\n([\s\S]+?)(?=\n##|\Z)", txt)
+        if sec2_m:
+            for line in sec2_m.group(1).split("\n"):
+                if "|" not in line:
+                    continue
+                cells = [c.strip() for c in line.split("|")]
+                cells = [c for c in cells if c]
+                if len(cells) < 5:
+                    continue
+                if all(re.match(r"^-+$", c) for c in cells):
+                    continue
+                if not re.match(r"^\d+$", cells[0]) and cells[0] != "⚠️":
+                    continue
+                item = cells[1]
+                if not item or item.lower() in ("item", "---") or len(item) < 3:
+                    continue
+                done_cell = cells[-1]
+                tenx_total += 1
+                if re.search(r"[xX]|✅", done_cell):
+                    tenx_done += 1
+                elif not gap:
+                    gap = item + " — not completed today"
+
+        # ── Log entries ────────────────────────────────────────────────────────
+        all_log_lines = []
+        for log_re in (r"##\s+Section 3[^\n]*\n([\s\S]+?)(?=\n##|\n---|\Z)",
+                       r"(?<!\S)##\s+Log\s*\n([\s\S]+?)(?=\n##|\n---|\Z)"):
+            lm = re.search(log_re, txt)
+            if lm:
+                all_log_lines += re.findall(r"^-\s+(.+)$", lm.group(1), re.MULTILINE)
+
+        outreach_sent = sum(
+            1 for l in all_log_lines
+            if re.search(r"outreach|sent|contacted|touched|messaged|reached out|follow.?up", l, re.IGNORECASE)
+        )
+
+        # Best win: log entry with positive signal, avoiding negatives and trivial entries
+        _pos = re.compile(r"\bcomplete|complet|done\b|confirmed|closed|booked|signed|shipped|fixed|resolved|sent\b|finished|launch|deliver", re.IGNORECASE)
+        _neg = re.compile(r"did not|didn't|no response|waiting|outstanding|not yet|blocked|pending|still open|not happen", re.IGNORECASE)
+        _trivial = re.compile(r"\btest\b|hello|is this working|is it working", re.IGNORECASE)
+        timestamped = [(m.group(1).strip(), line) for line in all_log_lines
+                       for m in [re.match(r"\d[\d:]+\s*(?:AM|PM)?\s*[-–]\s*(.{40,})", line)] if m]
+        # Prefer positive-signal entries
+        for txt_part, _ in reversed(timestamped):
+            if _pos.search(txt_part) and not _neg.search(txt_part) and not _trivial.search(txt_part):
+                win = txt_part[:160]
+                break
+        # Fallback: any non-negative substantive entry
+        if not win:
+            for txt_part, _ in reversed(timestamped):
+                if not _neg.search(txt_part) and not _trivial.search(txt_part):
+                    win = txt_part[:160]
+                    break
+
+        # ── End-of-Day Reflection ──────────────────────────────────────────────
+        refl_m = re.search(r"\*\*End-of-Day Reflection\*\*[^\n]*\n([\s\S]+?)(?=\n---|\n##|\Z)", txt)
+        if refl_m:
+            refl = refl_m.group(1)
+            q1 = re.search(r"1\.\s*What got done\?[^\n]*\n([^\n]{10,})", refl)
+            q2 = re.search(r"2\.\s*What didn[^\n]*\?[^\n]*\n([^\n]{10,})", refl)
+            q4 = re.search(r"4\.\s*What would make tomorrow better\?[^\n]*\n([^\n]{10,})", refl)
+            if q1 and not q1.group(1).strip().startswith(("2.", "3.", "4.")):
+                win = q1.group(1).strip()
+            if q2 and not q2.group(1).strip().startswith(("3.", "4.")):
+                gap = q2.group(1).strip()
+            if q4 and not q4.group(1).strip().startswith("-"):
+                next_up = q4.group(1).strip()
+
+    # ── Score: 70% 10x + 30% log density ──────────────────────────────────────
+    score = round((tenx_done / tenx_total) * 70) if tenx_total else 0
+    log_density = min(30, len(all_log_lines if 'all_log_lines' in dir() else []) * 2)
+    score = min(100, score + log_density)
+
+    # ── Tomorrow's Top 3 ───────────────────────────────────────────────────────
+    if brief_path.exists():
+        try:
+            tb = _cat(brief_path)
+        except Exception:
+            tb = ""
+        loops_m = re.search(r"##\s+Open Loops[^\n]*\n([\s\S]+?)(?=\n##|\Z)", tb)
+        if loops_m:
+            items = re.findall(r"^-\s+(.+)$", loops_m.group(1), re.MULTILINE)
+            tomorrow_items = [i.strip().strip("*").strip() for i in items if i.strip()][:3]
+
+    if not tomorrow_items and txt:
+        sec2_m = re.search(r"##\s+Section 2[^\n]*\n([\s\S]+?)(?=\n##|\Z)", txt)
+        if sec2_m:
+            for line in sec2_m.group(1).split("\n"):
+                if "|" not in line or len(tomorrow_items) >= 3:
+                    continue
+                cells = [c.strip() for c in line.split("|")]
+                cells = [c for c in cells if c]
+                if len(cells) < 5 or not re.match(r"^\d+$", cells[0]):
+                    continue
+                if re.search(r"\[\s*\]", cells[-1]):
+                    item = cells[1]
+                    if item and item.lower() not in ("item", "---") and len(item) > 3:
+                        tomorrow_items.append(item)
+
+    stats = [
+        {"dot": "#D1FAE5", "text": f"{tenx_done} of {tenx_total} 10x done" if tenx_total else "No 10x yet", "color": "#D1FAE5"},
+        {"dot": "#FCD34D", "text": f"{outreach_sent} outreach logged", "color": "#FCD34D"},
+        {"dot": "#6B7280", "text": f"{tenx_total - tenx_done} items open" if tenx_total else "—", "color": "#9CA3AF"},
+    ]
+
+    reflection = []
+    if win:
+        reflection.append({"label": "Win", "border": "#D1FAE5", "lc": "#1A4731", "text": win})
+    if gap:
+        reflection.append({"label": "Gap", "border": "#FCD34D", "lc": "#D97706", "text": gap})
+    reflection.append({
+        "label": "Next",
+        "border": "#E5E7EB",
+        "lc": "#6B7280",
+        "text": next_up or "Stone is staging tomorrow's brief.",
+    })
+
+    return {"score": score, "stats": stats, "reflection": reflection, "tomorrow": tomorrow_items}
 
 
 # ── MASK write-back ───────────────────────────────────────────────────────────
@@ -172,7 +255,7 @@ def write_mask_response(date_str, letter, response):
     note_path = DAILY_DIR / f"{date_str}.md"
     if not note_path.exists():
         return False
-    lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines = _cat(note_path).splitlines(keepends=True)
 
     in_mask = False
     prompt_idx = -1
@@ -184,22 +267,23 @@ def write_mask_response(date_str, letter, response):
         if in_mask:
             if stripped.startswith("## "):
                 break
-            if re.match(rf'^\*\*{re.escape(letter)}:\*\*', stripped):
+            # Match both **M:** and **M — Mindset** formats
+            if re.match(rf'^\*\*{re.escape(letter)}[\s:—–\-]', stripped):
                 prompt_idx = i
                 break
 
     if prompt_idx < 0:
         return False
 
-    # Find boundary: next **X:** or section heading or end
+    # Find boundary: next MASK letter heading or section heading
     search_end = len(lines)
     for i in range(prompt_idx + 1, len(lines)):
         stripped = lines[i].strip()
-        if re.match(r'^\*\*[MASK]:\*\*', stripped) or stripped.startswith("## "):
+        if re.match(r'^\*\*[MASK][\s:—–\-]', stripped) or stripped.startswith("## "):
             search_end = i
             break
 
-    # Replace existing blockquote or insert after prompt
+    # Replace existing blockquote or insert after last non-empty prompt line
     response_line = f"> {response}\n"
     existing = -1
     for i in range(prompt_idx + 1, search_end):
@@ -210,7 +294,12 @@ def write_mask_response(date_str, letter, response):
     if existing >= 0:
         lines[existing] = response_line
     else:
-        lines.insert(prompt_idx + 1, response_line)
+        # Insert after the last non-empty line in the block (end of prompt text)
+        insert_at = prompt_idx + 1
+        for i in range(prompt_idx + 1, search_end):
+            if lines[i].strip():
+                insert_at = i + 1
+        lines.insert(insert_at, response_line)
 
     note_path.write_text("".join(lines), encoding="utf-8")
     return True
@@ -222,7 +311,7 @@ def toggle_tenx(date_str, row_index, done):
     note_path = DAILY_DIR / f"{date_str}.md"
     if not note_path.exists():
         return False
-    lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines = _cat(note_path).splitlines(keepends=True)
     in_sec = False
     rows_seen = 0
     for i, line in enumerate(lines):
@@ -243,13 +332,96 @@ def toggle_tenx(date_str, row_index, done):
     return False
 
 
+# ── Contact tracker write-back ────────────────────────────────────────────────
+
+import datetime as _dt
+
+def update_contact_in_tracker(name, updates):
+    """
+    Updates a contact in Daily/contacts-cache.json (Notion is source of truth;
+    cache is the local mirror the dashboard reads).
+    updates: dict with any of: status, last_touch, due (MM/DD/YYYY string)
+    """
+    try:
+        raw = _cat(CONTACTS_CACHE)
+        data = json.loads(raw)
+        contacts = data.get("contacts", [])
+        clean = lambda s: re.sub(r"[^\w\s''-]", "", s).strip().lower()
+        target = clean(name)
+        today = _date.today()
+        matched = False
+        for c in contacts:
+            if clean(c.get("name", "")) != target:
+                continue
+            matched = True
+            if "last_touch" in updates:
+                c["lastTouch"] = updates["last_touch"]
+            if "due" in updates:
+                c["time"] = updates["due"]
+            if "status" in updates:
+                # Remap markdown status values to cache format
+                sl = updates["status"].lower()
+                if "priority" in sl:
+                    c["status"], c["av"] = "send", "av-green"
+                elif "active" in sl:
+                    c["status"], c["av"] = "send", "av-green"
+                else:
+                    c["status"], c["av"] = "active", "av-gray"
+            # Re-evaluate overdue after any update
+            due_str = c.get("time", "")
+            due_match = re.match(r"(\d{2})/(\d{2})/(\d{4})", due_str)
+            if due_match:
+                try:
+                    due_date = _date(int(due_match.group(3)), int(due_match.group(1)), int(due_match.group(2)))
+                    if due_date < today:
+                        c["status"], c["av"] = "overdue", "av-red"
+                except Exception:
+                    pass
+            break
+        if not matched:
+            return False
+        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
+        data["contacts"] = contacts
+        CONTACTS_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+# ── End-of-Day Wrap write-back ────────────────────────────────────────────────
+
+def write_wrap_reflection(date_str, answers):
+    """answers: dict with keys win, gap, worked, better"""
+    note_path = DAILY_DIR / f"{date_str}.md"
+    if not note_path.exists():
+        return False
+    txt = _cat(note_path)
+    refl_m = re.search(
+        r"(\*\*End-of-Day Reflection\*\*[^\n]*\n)"
+        r"(1\.[\s\S]+?)"
+        r"(?=\n---|\n##|\Z)",
+        txt,
+    )
+    if not refl_m:
+        return False
+    block = (
+        refl_m.group(1)
+        + f"1. What got done?\n{answers.get('win','').strip()}\n\n"
+        + f"2. What didn't get done?\n{answers.get('gap','').strip()}\n\n"
+        + f"3. What worked?\n{answers.get('worked','').strip()}\n\n"
+        + f"4. What would make tomorrow better?\n{answers.get('better','').strip()}"
+    )
+    note_path.write_text(txt[:refl_m.start()] + block + txt[refl_m.end():], encoding="utf-8")
+    return True
+
+
 # ── Log write-back ────────────────────────────────────────────────────────────
 
 def append_log(date_str, time_str, entry):
     note_path = DAILY_DIR / f"{date_str}.md"
     if not note_path.exists():
         return False
-    lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines = _cat(note_path).splitlines(keepends=True)
     log_line = f"- {time_str} - {entry}\n" if time_str else f"- {entry}\n"
     in_log = False
     last_entry_idx = -1
@@ -308,8 +480,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path in ("/icon-180.png", "/icon-512.png"):
             self.serve(DASHBOARD / path[1:], "image/png")
 
-        elif path == "/daily/Network-Tracker.md":
-            self.serve(TRACKER, "text/plain")
+        elif path == "/daily/contacts-cache.json":
+            self.serve(CONTACTS_CACHE, "application/json")
 
         elif path.startswith("/daily/"):
             fname = path[len("/daily/"):]
@@ -339,6 +511,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             try:
                 contacts = parse_contacts()
                 body = json.dumps(contacts, ensure_ascii=False).encode("utf-8")
+                self._respond(200, "application/json", body)
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/home":
+            from urllib.parse import parse_qs, urlparse as _up
+            qs = parse_qs(_up(self.path).query)
+            date_s = (qs.get("date") or [None])[0] or _date.today().isoformat()
+            if not re.match(r"\d{4}-\d{2}-\d{2}$", date_s):
+                self.send_error(400); return
+            try:
+                body = json.dumps(parse_home_data(date_s), ensure_ascii=False).encode("utf-8")
                 self._respond(200, "application/json", body)
             except Exception as e:
                 self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
@@ -395,16 +579,74 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 self.send_error(500)
 
+        elif path == "/api/contact/touch":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                name   = body.get("name", "").strip()
+                if not name:
+                    self.send_error(400); return
+                today     = _dt.date.today()
+                due_date  = (today + _dt.timedelta(days=7)).strftime("%m/%d/%Y")
+                today_str = today.strftime("%m/%d/%Y")
+                ok = update_contact_in_tracker(name, {
+                    "status":       "🟢 Active",
+                    "last_contact": today_str,
+                    "last_touch":   f"Touched via Stone Dashboard ({today_str})",
+                    "due":          due_date,
+                })
+                self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/contact/snooze":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                name   = body.get("name", "").strip()
+                days   = int(body.get("days", 7))
+                if not name:
+                    self.send_error(400); return
+                due_date = (_dt.date.today() + _dt.timedelta(days=days)).strftime("%m/%d/%Y")
+                ok = update_contact_in_tracker(name, {"due": due_date})
+                self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/wrap":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                date_s = body.get("date", "")
+                if not date_s or not re.match(r"\d{4}-\d{2}-\d{2}$", date_s):
+                    self.send_error(400); return
+                ok = write_wrap_reflection(date_s, {
+                    "win":    body.get("win", ""),
+                    "gap":    body.get("gap", ""),
+                    "worked": body.get("worked", ""),
+                    "better": body.get("better", ""),
+                })
+                self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
         else:
             self.send_error(404)
 
     def serve(self, filepath, content_type):
         try:
-            data = filepath.read_bytes()
+            if not filepath.exists():
+                self.send_error(404); return
+            # Use cat for iCloud paths to trigger download-on-demand
+            if "Mobile Documents" in str(filepath):
+                data = _cat(filepath, binary=True)
+            else:
+                data = filepath.read_bytes()
             self._respond(200, content_type, data)
         except FileNotFoundError:
             self.send_error(404)
-        except Exception:
+        except Exception as e:
+            import traceback; traceback.print_exc()
             self.send_error(500)
 
     def _respond(self, code, content_type, body):
