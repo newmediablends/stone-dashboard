@@ -102,9 +102,9 @@ def parse_contacts(max_rows=12):
                 except Exception:
                     pass
         contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
-        return {"contacts": contacts[:max_rows], "batchQueue": data.get("batchQueue")}
+        return {"contacts": contacts[:max_rows], "batchQueue": data.get("batchQueue"), "focusToday": data.get("focusToday", [])}
     except Exception:
-        return {"contacts": [], "batchQueue": None}
+        return {"contacts": [], "batchQueue": None, "focusToday": []}
 
 
 # ── Home data (Day Score, reflection, tomorrow) ───────────────────────────────
@@ -336,11 +336,12 @@ def toggle_tenx(date_str, row_index, done):
 
 import datetime as _dt
 
-def update_contact_in_tracker(name, updates):
+def update_contact_in_tracker(name, updates, clear_focus=False):
     """
     Updates a contact in Daily/contacts-cache.json (Notion is source of truth;
     cache is the local mirror the dashboard reads).
     updates: dict with any of: status, last_touch, due (MM/DD/YYYY string)
+    clear_focus: if True, removes this contact from the focusToday list
     """
     try:
         raw = _cat(CONTACTS_CACHE)
@@ -380,6 +381,9 @@ def update_contact_in_tracker(name, updates):
             break
         if not matched:
             return False
+        if clear_focus:
+            ft = data.get("focusToday", [])
+            data["focusToday"] = [n for n in ft if clean(n) != target]
         contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
         data["contacts"] = contacts
         CONTACTS_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -594,7 +598,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "last_contact": today_str,
                     "last_touch":   f"Touched via Stone Dashboard ({today_str})",
                     "due":          due_date,
-                })
+                }, clear_focus=True)
                 self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
             except Exception as e:
                 self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())

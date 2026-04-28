@@ -471,6 +471,7 @@ const sample = {
 
 let data = JSON.parse(JSON.stringify(sample));
 data.batchQueue = null;
+data.focusToday = [];
 
 /* ---- FILE PARSERS ---- */
 function section(md, ...headings) {
@@ -654,6 +655,7 @@ async function loadRealData(dir, dateStr) {
       if (contacts.length) {
         data.contacts = contacts;
         data.outreach = contacts.map(c => ({...c, msg:''}));
+        data.focusToday = payload.focusToday || [];
       }
     }
   } catch (e) { console.warn('Contacts cache:', e); }
@@ -903,7 +905,7 @@ function batchQueueAlert(){
 }
 function renderPeople(){
   const overdue=data.contacts.filter(c=>c.status==='overdue'),priority=data.contacts.filter(c=>c.status!=='overdue');
-  const row=c=>{const idx=data.contacts.indexOf(c);return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
+  const row=c=>{const idx=data.contacts.indexOf(c);const isFocus=(data.focusToday||[]).includes(c.name);const focusDot=isFocus?`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-left:6px;vertical-align:middle;flex-shrink:0;" title="Today's Focus"></span>`:'';return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name" style="display:flex;align-items:center;">${c.name}${focusDot}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
   return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div>${batchQueueAlert()}<div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
 }
 let projFilter = 'all';
@@ -1182,6 +1184,7 @@ async function fetchFromGitHub(dateStr) {
       if (contacts.length) {
         data.contacts = contacts;
         data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
+        data.focusToday = payload.focusToday || [];
       }
       data.batchQueue = batchQueue;
     } else {
@@ -1193,6 +1196,7 @@ async function fetchFromGitHub(dateStr) {
         if (contacts && contacts.length) {
           data.contacts = contacts;
           data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
+          data.focusToday = (payload && payload.focusToday) || [];
         }
       }
     }
