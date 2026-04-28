@@ -24,13 +24,13 @@ while IFS= read -r -d '' f; do
 done < <(find "$BRAIN/Daily" -name "*.md" -print0 2>/dev/null)
 echo "  $COUNT daily notes synced"
 
-# ---- Network Tracker ----
-TRACKER="$BRAIN/1-Projects/Job Search — VP or CPO Role/Network-Tracker.md"
-if [ -f "$TRACKER" ]; then
-  cp "$TRACKER" "$DAILY_OUT/Network-Tracker.md"
-  echo "  Network Tracker synced"
+# ---- Contacts cache (Notion-backed) ----
+CONTACTS_CACHE="$BRAIN/Daily/contacts-cache.json"
+if [ -f "$CONTACTS_CACHE" ]; then
+  cp "$CONTACTS_CACHE" "$DAILY_OUT/contacts-cache.json"
+  echo "  Contacts cache synced"
 else
-  echo "  Network Tracker not found — skipping"
+  echo "  contacts-cache.json not found — skipping"
 fi
 
 # ---- Project Status files ----

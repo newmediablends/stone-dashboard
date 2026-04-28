@@ -539,15 +539,15 @@ function parseDailyNote(md) {
   if (maskSec) {
     const labels = { M:'Mindset', A:'Action', S:'Spirituality', K:'Kindness' };
     out.maskJournal = ['M','A','S','K'].map(l => {
-      const promptRe = new RegExp(`\\*\\*${l}:\\*\\*\\s*([^\n]+)`);
-      const pm = maskSec.match(promptRe);
-      const prompt = pm ? pm[1].trim() : '';
-      let response = '';
-      if (pm) {
-        const after = maskSec.slice(maskSec.indexOf(pm[0]) + pm[0].length);
-        const rm = after.match(/^\s*\n+>\s*(.+)/);
-        if (rm) response = rm[1].trim().replace(/^"|"$/g,'');
-      }
+      // Match both "**M:** prompt" and "**M — Mindset**\nprompt on next line"
+      const blockRe = new RegExp(`\\*\\*${l}[\\s:—–\\-][^\\n]*\\n+([\\s\\S]+?)(?=\\n\\*\\*[MASK]|\\n##|$)`);
+      const bm = maskSec.match(blockRe);
+      if (!bm) return { letter:l, label:labels[l], prompt:'', response:'' };
+      const block = bm[1];
+      const promptLine = block.match(/^([^>\n][^\n]{5,})/m);
+      const prompt = promptLine ? promptLine[1].trim() : '';
+      const respLine = block.match(/^>\s*(.+)/m);
+      const response = respLine ? respLine[1].trim().replace(/^"|"$/g,'') : '';
       return { letter:l, label:labels[l], prompt, response };
     }).filter(m => m.prompt);
   }
@@ -590,57 +590,6 @@ function parseDailyNote(md) {
   return out;
 }
 
-function parseNetworkTracker(md) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const results = [];
-  let hdr = null;
-
-  for (const line of md.split('\n')) {
-    if (!line.includes('|')) continue;
-    const parts = line.split('|');
-    const cells = parts.slice(1, parts.length - 1).map(c => c.trim());
-    if (!cells.length) continue;
-    if (cells.every(c => /^-*$/.test(c))) continue;
-
-    const lower = cells.map(c => c.toLowerCase());
-    if (lower[0] === 'name' && lower.some(c => c === 'status')) {
-      hdr = {
-        name:    0,
-        company: lower.indexOf('company'),
-        status:  lower.indexOf('status'),
-        action:  lower.findIndex(c => c.includes('next action')),
-        due:     lower.indexOf('due'),
-      };
-      continue;
-    }
-
-    if (!hdr) continue;
-    const name = cells[hdr.name] || '';
-    if (!name || /^[-–—]+$/.test(name)) continue;
-    if (hdr.status >= 0 && cells.length <= hdr.status) continue;
-
-    const company   = hdr.company >= 0 ? cells[hdr.company] || '' : '';
-    const rawStatus = hdr.status  >= 0 ? cells[hdr.status]  || '' : '';
-    const action    = hdr.action  >= 0 && hdr.action  < cells.length ? cells[hdr.action]  || '' : '';
-    const due       = hdr.due     >= 0 && hdr.due     < cells.length ? cells[hdr.due]     || '' : '';
-
-    const initials = name.split(' ').map(w => w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
-    const sl = rawStatus.toLowerCase();
-    const dm = due.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    const dueDate = dm ? new Date(+dm[3], +dm[1]-1, +dm[2]) : null;
-    const isPastDue = dueDate && dueDate < today;
-
-    let status, av;
-    if (isPastDue)                 { status = 'overdue'; av = 'av-red';   }
-    else if (sl.includes('priority')) { status = 'send';    av = 'av-green'; }
-    else                           { status = 'active';  av = 'av-gray';  }
-
-    results.push({ initials, name, role: company, action, status, time: due, av });
-  }
-
-  results.sort((a,b) => ({overdue:0,send:1,active:2}[a.status]||2) - ({overdue:0,send:1,active:2}[b.status]||2));
-  return results.length ? results.slice(0,8) : null;
-}
 
 async function scanProjects(dir) {
   const projects = [];
@@ -696,18 +645,18 @@ async function loadRealData(dir, dateStr) {
   } catch (e) { console.warn('Daily note:', e); }
 
   try {
-    const projDir = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
-    const jobDir  = projDir && await projDir.getDirectoryHandle('Job Search — VP or CPO Role').catch(()=>null);
-    const tracker = jobDir  && await jobDir.getFileHandle('Network-Tracker.md').catch(()=>null);
-    if (tracker) {
-      const txt = await (await tracker.getFile()).text();
-      const contacts = parseNetworkTracker(txt);
-      if (contacts && contacts.length) {
+    const dailyDir = await dir.getDirectoryHandle('Daily').catch(()=>null);
+    const cacheFile = dailyDir && await dailyDir.getFileHandle('contacts-cache.json').catch(()=>null);
+    if (cacheFile) {
+      const txt = await (await cacheFile.getFile()).text();
+      const payload = JSON.parse(txt);
+      const contacts = payload.contacts || [];
+      if (contacts.length) {
         data.contacts = contacts;
         data.outreach = contacts.map(c => ({...c, msg:''}));
       }
     }
-  } catch (e) { console.warn('Network Tracker:', e); }
+  } catch (e) { console.warn('Contacts cache:', e); }
 
   try {
     const projDir = await dir.getDirectoryHandle('1-Projects').catch(()=>null);
@@ -841,8 +790,19 @@ function statusBadge(s) {
 }
 
 /* ---- HOME VIEWS ---- */
+function getMaskCards() {
+  if (data.maskJournal && data.maskJournal.length) {
+    return data.maskJournal.map(m => ({
+      letter: m.letter,
+      label:  m.label,
+      status: m.response ? 'done' : 'active',
+      detail: m.response ? m.response.substring(0, 22) + (m.response.length > 22 ? '…' : '') : 'Tap to answer',
+    }));
+  }
+  return data.mask;
+}
 function renderPrime() {
-  const cards = data.mask.map(m=>{const dot=m.status==='done'?'var(--green-btn)':m.status==='active'?'var(--amber)':'var(--border)';return`<div class="mask-card"><span class="mask-letter">${m.letter}</span><div class="mask-dot" style="background:${dot}"></div><span class="mask-sub">${m.detail}</span></div>`;}).join('');
+  const cards = getMaskCards().map(m=>{const dot=m.status==='done'?'var(--green-btn)':m.status==='active'?'var(--amber)':'var(--border)';return`<div class="mask-card"><span class="mask-letter">${m.letter}</span><div class="mask-dot" style="background:${dot}"></div><span class="mask-sub">${m.detail}</span></div>`;}).join('');
   const nxt = data.tenX.filter(t=>!t.done).slice(0,3).map(t=>`<div class="next-up-item"><span style="font-size:14px;color:var(--text);flex:1;">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
   return `${modeHero('prime')}<div class="mask-grid">${cards}</div>
     <div class="intention-card"><div class="intention-label">Today's Intention</div><div class="intention-text">I will execute with focus and lead with faith.</div></div>
@@ -862,7 +822,7 @@ function renderExecute(){
   const hits=data.tenX.map((t,i)=>({...t,_i:i})).filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row" onclick="toggleTenX(${t._i})"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
   return`${modeHero('execute')}${batchQueueAlert()?`<div style="margin-top:4px;">${batchQueueAlert()}</div>`:''}<div style="padding:0 24px 8px;"><div class="section-label">Outreach Queue</div>${q}</div><div style="padding:16px 24px 8px;border-top:1px solid var(--border-light);"><div class="section-label">Quick Hits</div>${hits}</div>`;
 }
-function renderWrap(){const w=data.wrap;const stats=w.stats.map(s=>`<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');const refl=w.reflection.map(r=>`<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');const tmrw=w.tomorrow.map((t,i)=>`<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');return`${modeHero('wrap')}<div class="day-score-card"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;"><div><div class="section-label" style="color:var(--dark-text-3);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--dark-text-2);">%</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div></div><div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint-bg);border-radius:999px;height:6px;width:${w.score}%;"></div></div></div><div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Tomorrow's Top 3</div>${tmrw}</div><div style="padding:0 24px 20px;"><div class="wrap-cta"><div><div class="wrap-cta-title">Run End-of-Day Wrap</div><div class="wrap-cta-sub">Stone stages tomorrow's brief</div></div><div class="wrap-icon">${arr()}</div></div></div>`;}
+function renderWrap(){const w=data.wrap;const stats=w.stats.map(s=>`<div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:${s.dot};flex-shrink:0;"></div><span style="font-size:12px;color:${s.color};">${s.text}</span></div>`).join('');const refl=w.reflection.map(r=>`<div class="reflection-card" style="border-left:3px solid ${r.border};"><span class="refl-label" style="color:${r.lc};">${r.label}</span><span class="refl-text">${r.text}</span></div>`).join('');const tmrw=w.tomorrow.map((t,i)=>`<div class="tmrw-row"><span class="tmrw-num">${i+1}</span><span class="tmrw-text">${t}</span></div>`).join('');const wrapFilled=w.reflection&&w.reflection.length>1&&w.reflection[0].text.length>20;const ctaLabel=wrapFilled?'Update Reflection':'Run End-of-Day Wrap';const ctaSub=wrapFilled?'Answers saved to daily note':'Fill in your 4 reflection answers';return`${modeHero('wrap')}<div class="day-score-card"><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;"><div><div class="section-label" style="color:var(--dark-text-3);margin-bottom:4px;">Day Score</div><div class="day-score-num">${w.score}<span style="font-size:28px;color:var(--dark-text-2);">%</span></div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${stats}</div></div><div style="background:rgba(255,255,255,0.15);border-radius:999px;height:6px;"><div style="background:var(--mint-bg);border-radius:999px;height:6px;width:${w.score}%;"></div></div></div><div style="padding:0 24px 20px;"><div class="section-label">End-of-Day Reflection</div>${refl}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Tomorrow's Top 3</div>${tmrw||'<div style="font-size:14px;color:var(--text-4);font-style:italic;">Run wrap to populate</div>'}</div><div style="padding:0 24px 20px;"><div class="wrap-cta" onclick="openWrapForm()"><div><div class="wrap-cta-title">${ctaLabel}</div><div class="wrap-cta-sub">${ctaSub}</div></div><div class="wrap-icon">${arr()}</div></div></div>`;}
 
 /* ---- SCHEDULE ENERGY MODES ---- */
 const _emodes = {
@@ -1225,11 +1185,11 @@ async function fetchFromGitHub(dateStr) {
       }
       data.batchQueue = batchQueue;
     } else {
-      // No local server — try synced Network Tracker snapshot (GitHub Pages)
-      const tr = await fetch('daily/Network-Tracker.md').catch(()=>null);
+      // No local server — try contacts-cache.json (static fallback)
+      const tr = await fetch('daily/contacts-cache.json').catch(()=>null);
       if (tr && tr.ok) {
-        const txt = await tr.text();
-        const contacts = parseNetworkTracker(txt);
+        const payload = await tr.json().catch(()=>null);
+        const contacts = payload && (payload.contacts || []);
         if (contacts && contacts.length) {
           data.contacts = contacts;
           data.outreach = contacts.filter(c => c.status === 'overdue' || c.status === 'send').map(c => ({...c, msg:''}));
@@ -1238,6 +1198,13 @@ async function fetchFromGitHub(dateStr) {
     }
   } catch {}
   await fetchProjects();
+  try {
+    const r = await fetch(`/api/home?date=${dateStr}&_t=${Date.now()}`);
+    if (r.ok) {
+      const h = await r.json();
+      if (typeof h.score === 'number') data.wrap = h;
+    }
+  } catch {}
 }
 
 async function navigateDay(delta) {
@@ -1493,6 +1460,12 @@ function contactAction(type) {
     const outreach = data.outreach.find(o => o.name === c.name);
     if (outreach) { outreach.status = 'active'; outreach.time = 'Today'; }
     if (navigator.vibrate) navigator.vibrate(8);
+    if (isLocalServer) {
+      fetch('/api/contact/touch', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name: c.name }) }).catch(()=>{});
+      fetch('/daily/log', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ date: formatDate(currentDate), time: t, entry: `Touched ${c.name}` }) }).catch(()=>{});
+    }
     render(activeTab);
   } else if (type === 'queue') {
     const exists = data.outreach.find(o => o.name === c.name);
@@ -1502,9 +1475,69 @@ function contactAction(type) {
   } else if (type === 'snooze') {
     data.contacts = data.contacts.filter(o => o.name !== c.name);
     data.outreach  = data.outreach.filter(o => o.name !== c.name);
+    if (navigator.vibrate) navigator.vibrate(8);
+    if (isLocalServer) {
+      fetch('/api/contact/snooze', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name: c.name, days: 7 }) }).catch(()=>{});
+    }
     render(activeTab);
   }
 }
+/* ---- WRAP FORM ---- */
+function openWrapForm() {
+  const w = data.wrap;
+  const prefill = {
+    win:    (w.reflection && w.reflection.find(r=>r.label==='Win')  || {}).text || '',
+    gap:    (w.reflection && w.reflection.find(r=>r.label==='Gap')  || {}).text || '',
+    next:   (w.reflection && w.reflection.find(r=>r.label==='Next') || {}).text || '',
+  };
+  const sheet = document.getElementById('contact-sheet');
+  const overlay = document.getElementById('contact-sheet-overlay');
+  const body = document.getElementById('contact-sheet-body');
+  if (!sheet || !body) return;
+  const q = (label, id, hint, val) =>
+    `<div style="margin-bottom:14px;">
+       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:5px;">${label}</div>
+       <textarea id="${id}" class="mask-journal-textarea" placeholder="${hint}" style="min-height:64px;">${esc(val)}</textarea>
+     </div>`;
+  body.innerHTML =
+    `<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">End-of-Day Reflection</div>`
+    + q('1. What got done?',            'wrap-win',    'Your biggest win today…',            prefill.win)
+    + q("2. What didn't get done?",     'wrap-gap',    'What slipped or got cut…',           prefill.gap)
+    + q('3. What worked?',              'wrap-worked', 'A tactic, mindset, or approach…',    '')
+    + q('4. What would make tomorrow better?', 'wrap-better', 'One thing to do differently…', prefill.next === "Stone is staging tomorrow's brief." ? '' : prefill.next)
+    + `<div style="display:flex;gap:8px;margin-top:4px;">
+         <button class="mask-save-btn" style="flex:1;" onclick="submitWrap()">Save to Daily Note</button>
+         <button class="mask-cancel-btn" onclick="closeContactDetail()">Cancel</button>
+       </div>`;
+  overlay.style.display = 'block';
+  overlay.style.opacity = '0';
+  requestAnimationFrame(() => { sheet.style.transform = 'translateY(0)'; overlay.style.opacity = '1'; });
+  setTimeout(() => { const el = document.getElementById('wrap-win'); if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; } }, 320);
+}
+
+async function submitWrap() {
+  const win    = (document.getElementById('wrap-win')    || {}).value || '';
+  const gap    = (document.getElementById('wrap-gap')    || {}).value || '';
+  const worked = (document.getElementById('wrap-worked') || {}).value || '';
+  const better = (document.getElementById('wrap-better') || {}).value || '';
+  if (!win && !gap) { alert('Add at least one answer before saving.'); return; }
+  closeContactDetail();
+  if (isLocalServer) {
+    try {
+      await fetch('/api/wrap', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ date: formatDate(currentDate), win, gap, worked, better }),
+      });
+      // Refresh home data so score and reflection update
+      const hr = await fetch(`/api/home?date=${formatDate(currentDate)}&_t=${Date.now()}`);
+      if (hr.ok) { const h = await hr.json(); if (typeof h.score === 'number') data.wrap = h; }
+    } catch {}
+  }
+  if (navigator.vibrate) navigator.vibrate([8, 50, 8]);
+  render('home');
+}
+
 (function initSheetSwipe() {
   const sheet = document.getElementById('contact-sheet');
   if (!sheet) return;
@@ -1546,6 +1579,10 @@ async function doRefresh() {
       if (parsed.log)         data.log         = parsed.log;
       if (parsed.quickHits)   data.quickHits   = parsed.quickHits;
       if (parsed.maskJournal) data.maskJournal = parsed.maskJournal;
+      try {
+        const hr = await fetch(`/api/home?date=${formatDate(currentDate)}&_t=${Date.now()}`);
+        if (hr.ok) { const h = await hr.json(); if (typeof h.score === 'number') data.wrap = h; }
+      } catch {}
       lastFetchTime = Date.now();
       updateConnectedNote();
       if (!document.querySelector('[data-editing]') && document.activeElement !== document.getElementById('mic-input')) {
