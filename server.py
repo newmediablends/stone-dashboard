@@ -32,7 +32,9 @@ DASHBOARD = Path(__file__).parent
 PORT      = 3000
 
 DAILY_DIR    = BRAIN / "Daily"
-CONTACTS_CACHE = DAILY_DIR / "contacts-cache.json"
+CONTACTS_CACHE_ICLOUD = DAILY_DIR / "contacts-cache.json"
+CONTACTS_CACHE_LOCAL  = DASHBOARD / "contacts-cache.json"   # always accessible by launchd
+CONTACTS_CACHE = CONTACTS_CACHE_LOCAL                        # server reads local; Stone syncs from iCloud
 PROJECTS     = BRAIN / "1-Projects"
 CERT      = DASHBOARD / "cert.pem"
 KEY       = DASHBOARD / "key.pem"
@@ -83,9 +85,18 @@ def ensure_cert(ip):
 
 from datetime import date as _date
 
+def _read_json_file(path):
+    """Read a JSON file — direct open for local paths, cat for iCloud paths."""
+    if "Mobile Documents" in str(path):
+        try:
+            return _cat(path)
+        except Exception:
+            pass
+    return path.read_text(encoding="utf-8")
+
 def parse_contacts(max_rows=12):
     try:
-        raw = _cat(CONTACTS_CACHE)
+        raw = _read_json_file(CONTACTS_CACHE)
         data = json.loads(raw)
         contacts = data.get("contacts", [])
         # Re-evaluate overdue status in case cache is from a previous day
@@ -390,7 +401,12 @@ def update_contact_in_tracker(name, updates, clear_focus=False):
             data["focusToday"] = [n for n in ft if clean(n) != target]
         contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
         data["contacts"] = contacts
-        CONTACTS_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        payload = json.dumps(data, ensure_ascii=False, indent=2)
+        CONTACTS_CACHE_LOCAL.write_text(payload, encoding="utf-8")
+        try:  # best-effort sync back to iCloud
+            CONTACTS_CACHE_ICLOUD.write_text(payload, encoding="utf-8")
+        except Exception:
+            pass
         return True
     except Exception:
         return False

@@ -681,6 +681,7 @@ function getMode() {
   return 'wrap';
 }
 const modeCfg = {
+  overview:{dot:'#818CF8',          color:'#A5B4FC',          label:'OVERVIEW',                   headline:'Full picture at a glance.',   bg:'#1E1B4B', fg:'#FFFFFF'},
   prime:   {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PRIME MODE · 5–9AM',        headline:'Ground. Intend. Begin.',      bg:'#1A4731', fg:'#FFFFFF'},
   peak:    {dot:'var(--green-btn)', color:'var(--mint-text)', label:'PEAK MODE · 9–11AM',         headline:'Lock in. Go deep.',           bg:'#1A4731', fg:'#FFFFFF'},
   rebuild: {dot:'var(--amber)',     color:'var(--amber)',     label:'REBUILD MODE · 11:30AM–2PM', headline:'Recharge. Connect. Prepare.', bg:'#92400E', fg:'#FFFFFF'},
@@ -700,14 +701,15 @@ function modeHero(m) {
   const chevron = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="${chevronPath}" stroke="${c.fg}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   const rows = Object.entries(modeCfg).map(([key, cfg]) => {
-    const isThisLive = key === live;
+    const isThisLive = key === live && key !== 'overview';
     const isSelected = key === m;
+    const divider = key === 'overview' ? `<div style="border-top:1px solid var(--border-light);margin:4px 0;"></div>` : '';
     return `<div class="mode-picker-row${isThisLive ? ' is-live' : ''}" onclick="selectMode('${key}')">
       <div class="mode-picker-dot" style="background:${cfg.dot}"></div>
       <span class="mode-picker-label" style="color:${cfg.color}">${cfg.label}</span>
       ${isThisLive ? `<span class="mode-live-tag">LIVE</span>` : ''}
       ${isSelected && !isThisLive ? `<svg class="mode-check" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--mint-text)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}
-    </div>`;
+    </div>${divider}`;
   }).join('');
 
   const panel = pickerOpen
@@ -802,6 +804,18 @@ function getMaskCards() {
     }));
   }
   return data.mask;
+}
+function renderOverview() {
+  const sched = data.schedule.map(s => {
+    const primary = (s.sub && s.sub.length > 1) ? s.sub : s.label;
+    const secondary = (s.sub && s.sub.length > 1 && s.label !== primary) ? `<div style="font-size:11px;color:var(--text-4);margin-top:1px;">${esc(s.label)}</div>` : '';
+    return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-light);"><div style="font-size:11px;color:var(--text-3);width:90px;flex-shrink:0;padding-top:2px;line-height:1.3;">${esc(s.time)}</div><div style="flex:1;"><div style="font-size:13px;color:var(--text);font-weight:500;line-height:1.3;">${esc(primary)}</div>${secondary}</div></div>`;
+  }).join('');
+  const tenx = data.tenX.map((t,i) => `<div class="tenx-row" onclick="toggleTenX(${i})"><div class="checkbox ${t.done?'done':t.pri?'pri':''}">${t.done?chk():''}</div><span class="tenx-label ${t.done?'done':''}">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
+  const focusNames = data.focusToday || [];
+  const focusContacts = data.contacts.filter(c => focusNames.includes(c.name));
+  const focusRows = focusContacts.map(c => { const idx=data.contacts.indexOf(c); return `<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}</div></div>`; }).join('');
+  return `${modeHero('overview')}<div style="padding:0 24px 20px;"><div class="section-label">Schedule</div>${sched||'<div style="font-size:13px;color:var(--text-4);font-style:italic;">No schedule loaded</div>'}</div><div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">10x Items</div>${tenx||'<div style="font-size:13px;color:var(--text-4);font-style:italic;">No items</div>'}</div>${focusRows?`<div style="padding:0 24px 20px;border-top:1px solid var(--border-light);"><div class="section-label">Today's Focus</div>${focusRows}</div>`:''}`;
 }
 function renderPrime() {
   const cards = getMaskCards().map(m=>{const dot=m.status==='done'?'var(--green-btn)':m.status==='active'?'var(--amber)':'var(--border)';return`<div class="mask-card"><span class="mask-letter">${m.letter}</span><div class="mask-dot" style="background:${dot}"></div><span class="mask-sub">${m.detail}</span></div>`;}).join('');
@@ -1066,7 +1080,8 @@ function render(tab) {
   let html='';
   if (tab==='home') {
     const mode = manualMode || getMode();
-    if (mode==='prime')        html=renderPrime();
+    if (mode==='overview')     html=renderOverview();
+    else if (mode==='prime')   html=renderPrime();
     else if (mode==='peak')  { html=renderPeak(); countdownTimer=setInterval(()=>{const el=document.getElementById('countdown');if(el)el.textContent=getPeakTime();else clearInterval(countdownTimer);},1000); }
     else if (mode==='rebuild') html=renderRebuild();
     else if (mode==='execute') html=renderExecute();

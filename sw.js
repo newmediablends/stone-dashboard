@@ -1,4 +1,4 @@
-const CACHE = 'stone-v3';
+const CACHE = 'stone-v4';
 const SHELL = ['./icon.svg', './icon-180.png'];
 
 self.addEventListener('install', e => {
