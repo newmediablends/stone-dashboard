@@ -98,12 +98,14 @@
 
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--green-btn); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-    .tab-bar { display: flex; align-items: center; gap: 8px; padding: 0 24px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0; }
+    .tab-bar { display: flex; align-items: center; gap: 8px; padding: 0 24px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0; position: relative; }
     .tab-bar::-webkit-scrollbar { display: none; }
-    .tab-pill { background: var(--bg-surface); color: var(--text-3); font-size: 14px; font-weight: 500; padding: 8px 18px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap; transition: background 0.15s, color 0.15s; -webkit-tap-highlight-color: transparent; }
-    .tab-pill.active { background: var(--text); color: var(--bg); font-weight: 600; }
+    .tab-pill { background: var(--bg-surface); color: var(--text-3); font-size: 14px; font-weight: 500; padding: 8px 18px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap; transition: color 0.2s; -webkit-tap-highlight-color: transparent; position: relative; z-index: 1; }
+    .tab-pill.active { color: var(--bg); font-weight: 600; background: transparent; }
+    #tab-slider { position: absolute; background: var(--text); border-radius: 999px; pointer-events: none; z-index: 0; transition: left 0.3s cubic-bezier(0.34,1.56,0.64,1), width 0.3s cubic-bezier(0.34,1.56,0.64,1), top 0.2s, height 0.2s; }
+    #tab-slider.no-anim { transition: none !important; }
 
-    .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(88px + env(safe-area-inset-bottom, 20px)); }
+    .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(88px + env(safe-area-inset-bottom, 20px)); transition: opacity 0.12s ease; }
 
     .mic-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px 24px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px)); background: var(--bg); border-top: 1px solid var(--border-light); }
     .mic-inner { display: flex; align-items: center; gap: 12px; background: var(--bg-surface); border: 1px solid var(--mic-border); border-radius: 14px; padding: 14px 16px; }
@@ -293,6 +295,24 @@
     .day-label.past { color:var(--amber); }
     @keyframes ptr-spin { to { transform: rotate(360deg); } }
     #ptr-svg.spinning { animation: ptr-spin 0.7s linear infinite; }
+
+    /* ---- MODE PICKER ANIMATION ---- */
+    .mode-picker-panel { animation: picker-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both; transform-origin: top left; }
+    @keyframes picker-in { from { opacity: 0; transform: scale(0.9) translateY(-6px); } to { opacity: 1; transform: none; } }
+
+    /* ---- OVERLAY FADE ---- */
+    #contact-sheet-overlay { transition: opacity 0.2s ease; }
+
+    /* ---- CHECKBOX DRAW ---- */
+    @keyframes check-draw { from { stroke-dashoffset: 15; } to { stroke-dashoffset: 0; } }
+    .check-path { stroke-dasharray: 15; animation: check-draw 0.22s ease forwards; }
+
+    /* ---- CONTACT ACTIONS ---- */
+    .action-btn { flex: 1; font-size: 14px; font-weight: 600; padding: 12px 8px; border-radius: 12px; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.1s; }
+    .action-btn:active { opacity: 0.7; }
+    .action-btn-primary { background: var(--green-btn); color: #fff; }
+    .action-btn-secondary { background: var(--bg-surface); color: var(--text); border: 1px solid var(--border) !important; }
+    .action-btn-ghost { background: var(--bg-surface); color: var(--text-3); border: 1px solid var(--border) !important; font-weight: 500; }
   </style>
   <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </head>
@@ -325,6 +345,7 @@
     <span>No plan yet for today — run Plan My Day in Stone</span>
   </div>
   <div class="tab-bar" id="tab-bar" style="display:none;">
+    <div id="tab-slider"></div>
     <button class="tab-pill active" data-tab="home">Home</button>
     <button class="tab-pill" data-tab="day">Day</button>
     <button class="tab-pill" data-tab="people">People</button>
@@ -776,8 +797,27 @@ function goLive() {
 }
 function updateLiveChip() { /* inline in modeHero now */ }
 
+let _sliderReady = false;
+function updateTabSlider() {
+  const bar = document.getElementById('tab-bar');
+  const active = bar && bar.querySelector('.tab-pill.active');
+  const slider = document.getElementById('tab-slider');
+  if (!active || !slider) return;
+  const instant = !_sliderReady;
+  if (instant) { _sliderReady = true; slider.classList.add('no-anim'); }
+  requestAnimationFrame(() => {
+    slider.style.left   = active.offsetLeft + 'px';
+    slider.style.top    = active.offsetTop  + 'px';
+    slider.style.width  = active.offsetWidth + 'px';
+    slider.style.height = active.offsetHeight + 'px';
+    if (instant) requestAnimationFrame(() => slider.classList.remove('no-anim'));
+  });
+}
+
+let _activeContact = null;
+
 /* ---- HELPERS ---- */
-const chk = () => `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const chk = () => `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path class="check-path" d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const arr = () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -958,9 +998,12 @@ function render(tab) {
   else if (tab==='people')     html=renderPeople();
   else if (tab==='projects')   html=renderProjects();
   const content=document.getElementById('content');
-  content.innerHTML=html;
-  content.scrollTop=0;
+  content.style.opacity = '0';
+  content.innerHTML = html;
+  content.scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => { content.style.opacity = '1'; }));
   updateLiveChip();
+  updateTabSlider();
 }
 
 document.getElementById('tab-bar').addEventListener('click', e=>{
@@ -1250,6 +1293,7 @@ async function toggleTenX(i) {
 
 /* ---- CONTACT DETAIL ---- */
 function showContactDetail(c) {
+  _activeContact = c;
   const body = document.getElementById('contact-sheet-body');
   const sheet = document.getElementById('contact-sheet');
   const overlay = document.getElementById('contact-sheet-overlay');
@@ -1268,16 +1312,62 @@ function showContactDetail(c) {
     ${c.lastTouch ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Last Touch</div><div style="font-size:14px;color:var(--text-2);line-height:1.5;">${c.lastTouch}</div></div>` : ''}
     ${c.action ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Next Action</div><div style="font-size:14px;color:var(--text);line-height:1.5;">${c.action}</div></div>` : ''}
     ${c.time ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Due</div><div style="font-size:14px;color:${c.status==='overdue'?'var(--red-text)':'var(--text-2)'};">${c.time}</div></div>` : ''}
-    ${c.notes ? `<div style="margin-bottom:4px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Notes</div><div style="font-size:13px;color:var(--text-3);line-height:1.6;">${c.notes}</div></div>` : ''}
+    ${c.notes ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Notes</div><div style="font-size:13px;color:var(--text-3);line-height:1.6;">${c.notes}</div></div>` : ''}
+    <div style="margin-top:6px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <button class="action-btn action-btn-primary" onclick="contactAction('draft')">Draft Message</button>
+        <button class="action-btn action-btn-secondary" onclick="contactAction('touch')">Mark Touched</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="action-btn action-btn-ghost" onclick="contactAction('queue')">Add to Queue</button>
+        <button class="action-btn action-btn-ghost" onclick="contactAction('snooze')">Snooze 7 Days</button>
+      </div>
+    </div>
   `;
   overlay.style.display = 'block';
-  requestAnimationFrame(() => { sheet.style.transform = 'translateY(0)'; });
+  overlay.style.opacity = '0';
+  requestAnimationFrame(() => {
+    sheet.style.transform = 'translateY(0)';
+    overlay.style.opacity = '1';
+  });
 }
 function closeContactDetail() {
   const sheet = document.getElementById('contact-sheet');
   const overlay = document.getElementById('contact-sheet-overlay');
   if (sheet) sheet.style.transform = 'translateY(100%)';
-  if (overlay) overlay.style.display = 'none';
+  if (overlay) { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 220); }
+}
+
+function contactAction(type) {
+  const c = _activeContact;
+  if (!c) return;
+  closeContactDetail();
+  const now = new Date();
+  const t = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  if (type === 'draft') {
+    const exists = data.outreach.find(o => o.name === c.name);
+    if (!exists) data.outreach.unshift({ ...c, msg: `Stone is drafting a message for ${c.name}...`, status: 'draft' });
+    manualMode = 'execute';
+    render('home');
+  } else if (type === 'touch') {
+    data.log.push({ time: t, entry: `Touched ${c.name}` });
+    const contact = data.contacts.find(o => o.name === c.name);
+    if (contact) { contact.status = 'active'; contact.av = 'av-gray'; contact.time = 'Today'; }
+    const outreach = data.outreach.find(o => o.name === c.name);
+    if (outreach) { outreach.status = 'active'; outreach.time = 'Today'; }
+    if (navigator.vibrate) navigator.vibrate(8);
+    render(activeTab);
+  } else if (type === 'queue') {
+    const exists = data.outreach.find(o => o.name === c.name);
+    if (!exists) data.outreach.unshift({ ...c, msg: '' });
+    if (navigator.vibrate) navigator.vibrate(8);
+    render(activeTab);
+  } else if (type === 'snooze') {
+    data.contacts = data.contacts.filter(o => o.name !== c.name);
+    data.outreach  = data.outreach.filter(o => o.name !== c.name);
+    render(activeTab);
+  }
 }
 (function initSheetSwipe() {
   const sheet = document.getElementById('contact-sheet');
