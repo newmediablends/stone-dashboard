@@ -247,6 +247,13 @@
     .pri-m { background: var(--bg-surface); color: var(--text-2); }
     .pri-l { background: var(--bg-surface); color: var(--text-4); }
 
+    .proj-filter-pill { background: var(--bg-surface); color: var(--text-3); font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 999px; border: none; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; transition: background 0.15s, color 0.15s; }
+    .proj-filter-pill.active { background: var(--text); color: var(--bg); font-weight: 600; }
+    .proj-action-btn { flex: 1; background: var(--bg-surface); color: var(--text-2); font-size: 13px; font-weight: 600; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.1s; }
+    .proj-action-btn:active { opacity: 0.65; }
+    .proj-action-btn.danger { background: var(--red-bg); color: var(--red-text); border-color: var(--red-bg); }
+    .proj-action-btn.safe   { background: var(--mint-bg); color: var(--mint-text); border-color: var(--mint-bg); }
+
     .log-entry { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
     .log-time { font-size: 14px; color: var(--text-4); flex-shrink: 0; padding-top: 1px; width: 42px; }
     .log-text { font-size: 15px; color: var(--text-2); line-height: 22px; }
@@ -940,9 +947,118 @@ function renderPeople(){
   const row=c=>{const idx=data.contacts.indexOf(c);return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
   return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div>${batchQueueAlert()}<div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
 }
-function renderProjects(){
-  const cards=data.projects.map(p=>`<div class="project-card"><div class="proj-header"><div><div class="proj-name">${p.name}</div><div class="proj-sub">${p.sub}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${statusBadge(p.status)}<span class="badge ${p.pri==='H'?'pri-h':p.pri==='M'?'pri-m':'pri-l'}">${p.pri}</span></div></div><div class="proj-next"><span class="proj-next-label ${p.blocked?'blocked':''}">${p.blocked?'Blocked':'Next'} → </span>${p.next}</div></div>`).join('');
-  return`<div style="padding:0 24px 16px;"><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Projects</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.projects.filter(p=>p.status==='active').length} active · ${data.projects.filter(p=>p.status==='blocked').length} blocked</div></div><div style="padding:0 24px;">${cards}</div>`;
+let projFilter = 'all';
+const projExpanded = new Set();
+
+function setProjFilter(f) { projFilter = f; render(activeTab); }
+
+function toggleProjExpand(idx) {
+  if (projExpanded.has(idx)) projExpanded.delete(idx); else projExpanded.add(idx);
+  render(activeTab);
+}
+
+function toggleProjBlocked(idx) {
+  const p = data.projects[idx];
+  if (!p) return;
+  p.blocked = !p.blocked;
+  p.status = p.blocked ? 'blocked' : 'active';
+  if (navigator.vibrate) navigator.vibrate(8);
+  render(activeTab);
+}
+
+function logProjUpdate(idx) {
+  const p = data.projects[idx];
+  if (!p) return;
+  const input = document.getElementById('mic-input');
+  if (input) { input.value = p.name + ': '; input.focus(); input.selectionStart = input.selectionEnd = input.value.length; }
+}
+
+function renderProjects() {
+  const all = data.projects;
+  const filtered = projFilter === 'all'     ? all
+    : projFilter === 'active'  ? all.filter(p => p.status === 'active')
+    : projFilter === 'blocked' ? all.filter(p => p.blocked)
+    : all.filter(p => p.pri === 'H');
+
+  const activeCount  = all.filter(p => p.status === 'active').length;
+  const blockedCount = all.filter(p => p.blocked).length;
+  const slowCount    = all.filter(p => p.status === 'slow').length;
+  const highCount    = all.filter(p => p.pri === 'H').length;
+
+  const filterLabels = {
+    all:     'All (' + all.length + ')',
+    active:  'Active (' + activeCount + ')',
+    blocked: 'Blocked (' + blockedCount + ')',
+    high:    'High Pri (' + highCount + ')',
+  };
+  const filterPills = ['all','active','blocked','high'].map(f =>
+    '<button class="proj-filter-pill' + (projFilter === f ? ' active' : '') + '" onclick="setProjFilter(\'' + f + '\')">' + filterLabels[f] + '</button>'
+  ).join('');
+
+  const chevronDown = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const chevronUp   = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const cards = filtered.map(p => {
+    const idx = all.indexOf(p);
+    const isExpanded = p.pri === 'H' || projExpanded.has(idx);
+    const borderColor = p.blocked ? 'var(--red-text)' : p.status === 'slow' ? 'var(--amber)' : 'var(--border)';
+    const staleDot = p.status === 'slow'
+      ? '<div style="width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;margin-top:5px;"></div>'
+      : '';
+    const priClass = p.pri === 'H' ? 'pri-h' : p.pri === 'M' ? 'pri-m' : 'pri-l';
+
+    if (!isExpanded) {
+      return '<div class="project-card" style="border-color:' + borderColor + ';cursor:pointer;padding:13px 16px;" onclick="toggleProjExpand(' + idx + ')">'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+        + staleDot
+        + '<div style="flex:1;font-size:15px;font-weight:600;color:var(--text);">' + esc(p.name) + '</div>'
+        + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;color:var(--text-4);">'
+        + statusBadge(p.status)
+        + '<span class="badge ' + priClass + '">' + p.pri + '</span>'
+        + chevronDown
+        + '</div></div></div>';
+    }
+
+    const collapseBtn = p.pri !== 'H'
+      ? '<button onclick="event.stopPropagation();toggleProjExpand(' + idx + ');" style="background:none;border:none;cursor:pointer;padding:2px;color:var(--text-4);flex-shrink:0;display:flex;">' + chevronUp + '</button>'
+      : '';
+
+    const blockBtn = p.blocked
+      ? '<button class="proj-action-btn safe" onclick="toggleProjBlocked(' + idx + ');event.stopPropagation();">Unblock</button>'
+      : '<button class="proj-action-btn danger" onclick="toggleProjBlocked(' + idx + ');event.stopPropagation();">Mark Blocked</button>';
+
+    return '<div class="project-card" style="border-color:' + borderColor + ';">'
+      + '<div class="proj-header">'
+      + '<div style="display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0;">'
+      + staleDot
+      + '<div style="min-width:0;"><div class="proj-name">' + esc(p.name) + '</div>'
+      + (p.sub ? '<div class="proj-sub">' + esc(p.sub) + '</div>' : '')
+      + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
+      + statusBadge(p.status)
+      + '<span class="badge ' + priClass + '">' + p.pri + '</span>'
+      + collapseBtn
+      + '</div></div>'
+      + '<div class="proj-next"><span class="proj-next-label' + (p.blocked ? ' blocked' : '') + '">' + (p.blocked ? 'Blocked' : 'Next') + ' → </span>' + esc(p.next) + '</div>'
+      + '<div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-light);">'
+      + '<button class="proj-action-btn" onclick="logProjUpdate(' + idx + ');event.stopPropagation();">Log Update</button>'
+      + blockBtn
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  const attnNote = slowCount > 0
+    ? ' · <span style="color:var(--amber-text);">' + slowCount + ' slow</span>'
+    : '';
+
+  return '<div style="padding:0 24px 12px;">'
+    + '<div style="font-family:\'DM Serif Display\',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Projects</div>'
+    + '<div style="font-size:13px;color:var(--text-3);margin-top:2px;">' + activeCount + ' active · ' + blockedCount + ' blocked' + attnNote + '</div>'
+    + '</div>'
+    + '<div style="padding:0 24px 16px;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">' + filterPills + '</div>'
+    + '<div style="padding:0 24px;">'
+    + (cards || '<div style="font-size:14px;color:var(--text-4);padding:8px 0;">No projects match this filter.</div>')
+    + '</div>';
 }
 
 /* ---- CONNECT SCREEN ---- */
