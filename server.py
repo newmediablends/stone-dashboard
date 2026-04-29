@@ -36,6 +36,7 @@ DASHBOARD = Path(__file__).parent
 PORT      = 3000
 
 DAILY_DIR    = BRAIN / "Daily"
+DAILY_LOCAL  = DASHBOARD / "daily"                          # local synced copies — always readable by launchd
 CONTACTS_CACHE_ICLOUD = DAILY_DIR / "contacts-cache.json"
 CONTACTS_CACHE_LOCAL  = DASHBOARD / "contacts-cache.json"   # always accessible by launchd
 CONTACTS_CACHE = CONTACTS_CACHE_LOCAL                        # server reads local; Stone syncs from iCloud
@@ -284,10 +285,11 @@ def parse_home_data(date_str):
 # ── MASK write-back ───────────────────────────────────────────────────────────
 
 def write_mask_response(date_str, letter, response):
-    note_path = DAILY_DIR / f"{date_str}.md"
+    local_path = DAILY_LOCAL / f"{date_str}.md"
+    note_path = local_path if local_path.exists() else DAILY_DIR / f"{date_str}.md"
     if not note_path.exists():
         return False
-    lines = _cat(note_path).splitlines(keepends=True)
+    lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
 
     in_mask = False
     prompt_idx = -1
@@ -344,11 +346,12 @@ def write_mask_response(date_str, letter, response):
 # ── 10x toggle ────────────────────────────────────────────────────────────────
 
 def toggle_tenx(date_str, row_index, done):
-    note_path = DAILY_DIR / f"{date_str}.md"
+    local_path = DAILY_LOCAL / f"{date_str}.md"
+    note_path = local_path if local_path.exists() else DAILY_DIR / f"{date_str}.md"
     try:
         if not note_path.exists():
             raise FileNotFoundError
-        lines = _cat(note_path).splitlines(keepends=True)
+        lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
         in_sec = False
         rows_seen = 0
         for i, line in enumerate(lines):
@@ -441,10 +444,11 @@ def update_contact_in_tracker(name, updates, clear_focus=False):
 
 def write_wrap_reflection(date_str, answers):
     """answers: dict with keys win, gap, worked, better"""
-    note_path = DAILY_DIR / f"{date_str}.md"
+    local_path = DAILY_LOCAL / f"{date_str}.md"
+    note_path = local_path if local_path.exists() else DAILY_DIR / f"{date_str}.md"
     if not note_path.exists():
         return False
-    txt = _cat(note_path)
+    txt = note_path.read_text(encoding="utf-8")
     refl_m = re.search(
         r"(\*\*End-of-Day Reflection\*\*[^\n]*\n)"
         r"(1\.[\s\S]+?)"
@@ -467,12 +471,13 @@ def write_wrap_reflection(date_str, answers):
 # ── Log write-back ────────────────────────────────────────────────────────────
 
 def append_log(date_str, time_str, entry):
-    note_path = DAILY_DIR / f"{date_str}.md"
+    local_path = DAILY_LOCAL / f"{date_str}.md"
+    note_path = local_path if local_path.exists() else DAILY_DIR / f"{date_str}.md"
     log_line = f"- {time_str} - {entry}\n" if time_str else f"- {entry}\n"
     try:
         if not note_path.exists():
             raise FileNotFoundError
-        lines = _cat(note_path).splitlines(keepends=True)
+        lines = note_path.read_text(encoding="utf-8").splitlines(keepends=True)
         in_log = False
         last_entry_idx = -1
         log_section_idx = -1
@@ -542,7 +547,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path.startswith("/daily/"):
             fname = path[len("/daily/"):]
             if len(fname) == 13 and fname.endswith(".md") and fname[:4].isdigit():
-                self.serve(DAILY_DIR / fname, "text/plain")
+                local = DAILY_LOCAL / fname
+                icloud = DAILY_DIR / fname
+                if local.exists():
+                    self.serve(local, "text/plain")
+                elif icloud.exists():
+                    self.serve(icloud, "text/plain")
+                else:
+                    self.send_error(404)
             else:
                 self.send_error(404)
 
