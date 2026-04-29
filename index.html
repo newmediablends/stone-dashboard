@@ -349,6 +349,11 @@
 
       /* Projects 2-col grid */
       .proj-cards-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+
+      /* Day tab 2-col layout */
+      .day-cols { display: flex; align-items: start; }
+      .day-col-1 { flex: 1; min-width: 0; border-right: 1px solid var(--border-light); }
+      .day-col-2 { flex: 1; min-width: 0; }
     }
 
     @media (min-width: 1280px) {
@@ -982,7 +987,7 @@ function renderDay(){
         </div>`).join('')
       }</div>` : '';
 
-  return`<div class="faith-anchor">${data.faithAnchor}</div><div class="section"><div class="section-label">Schedule</div>${sched}</div><div class="section"><div class="section-label">10x Items</div>${tenx}</div>${qhHtml}${maskHtml}<div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div>`;
+  return`<div class="faith-anchor">${data.faithAnchor}</div><div class="day-cols"><div class="day-col-1"><div class="section"><div class="section-label">Schedule</div>${sched}</div></div><div class="day-col-2"><div class="section"><div class="section-label">10x Items</div>${tenx}</div>${qhHtml}${maskHtml}<div class="section"><div class="section-label">Log</div>${log}<div style="display:flex;align-items:center;gap:8px;margin-top:8px;opacity:0.5;"><div style="width:6px;height:6px;border-radius:50%;background:var(--border);"></div><span style="font-size:13px;color:var(--text-4);font-style:italic;">Narrate to add an entry...</span></div></div></div></div>`;
 }
 function batchQueueAlert(){
   const bq=data.batchQueue;
