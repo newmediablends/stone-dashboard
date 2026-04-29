@@ -741,6 +741,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
 
+        elif path == "/api/focus/sync":
+            # Stone calls this at Plan My Day with the names that Notion marks Focus="Next".
+            # Sets focus:true for those contacts, clears it for everyone else, updates focusToday.
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                names  = [n.strip() for n in body.get("names", []) if isinstance(n, str) and n.strip()]
+                clean  = lambda s: re.sub(r"[^\w\s''-]", "", s).strip().lower()
+                focus_set = {clean(n) for n in names}
+                raw  = _cat(CONTACTS_CACHE)
+                data = json.loads(raw)
+                contacts = data.get("contacts", [])
+                synced = cleared = 0
+                for c in contacts:
+                    cn = clean(c.get("name", ""))
+                    was = bool(c.get("focus"))
+                    now = cn in focus_set
+                    c["focus"] = now
+                    if now and not was:
+                        synced += 1
+                    elif not now and was:
+                        cleared += 1
+                data["focusToday"] = names
+                contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "nurture": 2, "active": 3}.get(c["status"], 3))
+                data["contacts"] = contacts
+                payload = json.dumps(data, ensure_ascii=False, indent=2)
+                CONTACTS_CACHE_LOCAL.write_text(payload, encoding="utf-8")
+                try:
+                    CONTACTS_CACHE_ICLOUD.write_text(payload, encoding="utf-8")
+                except Exception:
+                    pass
+                self._respond(200, "application/json", json.dumps({"ok": True, "synced": synced, "cleared": cleared, "total_focus": len(names)}).encode())
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
         else:
             self.send_error(404)
 
