@@ -160,6 +160,7 @@
     .av-green { background: var(--mint-bg); color: var(--mint-text); }
     .av-red   { background: var(--red-bg);  color: var(--red-text);  }
     .av-gray  { background: var(--bg-surface); color: var(--text-2); }
+    .av-amber { background: var(--amber-bg); color: var(--amber-text); }
 
     .mask-grid { display: flex; gap: 8px; padding: 0 24px 20px; }
     .mask-card { flex: 1; background: var(--bg-surface); border-radius: 10px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -472,6 +473,7 @@ const sample = {
 let data = JSON.parse(JSON.stringify(sample));
 data.batchQueue = null;
 data.focusToday = [];
+data.outreachDrafts = {};
 
 /* ---- FILE PARSERS ---- */
 function section(md, ...headings) {
@@ -788,7 +790,7 @@ function typeBadge(t) {
   return `<span class="badge bg-gray">${esc(t)||'—'}</span>`;
 }
 function statusBadge(s) {
-  const m={active:['bg-green','Active'],slow:['bg-amber','Slow'],blocked:['bg-red','Blocked'],overdue:['bg-red','Overdue'],send:['bg-green','Send'],draft:['bg-amber','Draft'],waiting:['bg-gray','Waiting']};
+  const m={active:['bg-green','Active'],slow:['bg-amber','Slow'],blocked:['bg-red','Blocked'],overdue:['bg-red','Overdue'],send:['bg-green','Send'],nurture:['bg-amber','Nurture'],draft:['bg-amber','Draft'],waiting:['bg-gray','Waiting']};
   const [cls,lbl]=m[s]||['bg-gray',s];
   return `<span class="badge ${cls}">${lbl}</span>`;
 }
@@ -831,8 +833,7 @@ function renderRebuild(){const done=data.tenX.filter(t=>t.done).length,total=dat
 function renderExecute(){
   const q=data.outreach.map((c,i)=>{
     const border=i<data.outreach.length-1?'padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px;':'';
-    const msgHtml=c.msg?`<div class="msg-preview ${c.status==='draft'?'drafting':''}">${c.msg}</div>`
-      :`<div style="font-size:12px;color:var(--text-4);margin-top:6px;font-style:italic;">${c.action}</div>`;
+    const msgHtml=`<div class="msg-preview ${c.status==='draft'&&!c.msg?'drafting':''}" contenteditable="true" data-contact="${c.name.replace(/"/g,'&quot;')}" onblur="saveDraftMsg(this,'${c.name.replace(/'/g,"\\'")}',${i})" style="min-height:36px;outline:none;-webkit-user-select:text;user-select:text;" spellcheck="false">${c.msg||`<span style='color:var(--text-4);font-style:italic;'>${c.action}</span>`}</div>`;
     const ci=data.contacts.findIndex(o=>o.name===c.name);const od=ci>=0?`onclick="showContactDetail(data.contacts[${ci}])"`:'';;return`<div style="${border}"><div style="display:flex;align-items:center;gap:12px;"><div class="avatar-sm ${c.av}" ${od} style="${ci>=0?'cursor:pointer;':''}">${c.initials}</div><div style="flex:1;${ci>=0?'cursor:pointer;':''}" ${od}><div class="contact-name">${c.name}</div><div class="contact-role">${c.role}</div></div><button class="send-btn ${c.status==='draft'?'draft':''}" onclick="event.stopPropagation()">${c.status==='draft'?'Draft':'Send'}</button></div>${msgHtml}</div>`;
   }).join('');
   const hits=data.tenX.map((t,i)=>({...t,_i:i})).filter(t=>!t.done).slice(0,3).map(t=>`<div class="tenx-row" onclick="toggleTenX(${t._i})"><div class="checkbox ${t.pri?'pri':''}"></div><span class="tenx-label">${t.label}</span>${typeBadge(t.type)}</div>`).join('');
@@ -918,9 +919,18 @@ function batchQueueAlert(){
   return`<div style="margin:0 24px 16px;background:var(--amber-bg,rgba(251,191,36,0.12));border:1px solid var(--amber,#F59E0B);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="var(--amber-text,#B45309)" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="var(--amber-text,#B45309)" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="var(--amber-text,#B45309)" stroke-width="2.5" stroke-linecap="round"/></svg><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:var(--amber-text,#B45309);line-height:1.3;">${bq.count} first-touch contacts due ${bq.label}</div><div style="font-size:12px;color:var(--amber-text,#B45309);margin-top:3px;opacity:0.85;">Dio needs to batch-draft these — tell Stone to run it now.</div></div></div>`;
 }
 function renderPeople(){
-  const overdue=data.contacts.filter(c=>c.status==='overdue'),priority=data.contacts.filter(c=>c.status!=='overdue');
-  const row=c=>{const idx=data.contacts.indexOf(c);const isFocus=(data.focusToday||[]).includes(c.name);const focusDot=isFocus?`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-left:6px;vertical-align:middle;flex-shrink:0;" title="Today's Focus"></span>`:'';return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name" style="display:flex;align-items:center;">${c.name}${focusDot}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
-  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div>${batchQueueAlert()}<div style="padding:0 24px;">${overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:''}<div class="section-label" style="margin-top:${overdue.length?'18px':'0'};">Priority</div>${priority.map(row).join('')}</div>`;
+  const focus=data.contacts.filter(c=>c.focus);
+  const overdue=data.contacts.filter(c=>c.status==='overdue');
+  const send=data.contacts.filter(c=>c.status==='send');
+  const nurture=data.contacts.filter(c=>c.status==='nurture');
+  const active=data.contacts.filter(c=>c.status==='active');
+  const row=c=>{const idx=data.contacts.indexOf(c);return`<div class="contact-row" onclick="showContactDetail(data.contacts[${idx}])" style="cursor:pointer;"><div class="contact-avatar ${c.av}">${c.initials}</div><div class="contact-info"><div class="contact-name">${c.name}</div><div class="contact-role">${c.role} · ${c.action}</div></div><div class="contact-meta">${statusBadge(c.status)}<span class="contact-time">${c.time}</span></div></div>`;};
+  const focusSect=focus.length?`<div style="padding-bottom:16px;margin-bottom:4px;border-bottom:1px solid var(--border-light);"><div class="section-label" style="color:var(--mint-text);">Today's Focus</div>${focus.map(row).join('')}</div>`:'';
+  const overdueHtml=overdue.length?`<div class="section-label" style="color:var(--red-text);">Overdue</div>${overdue.map(row).join('')}`:'';
+  const sendHtml=send.length?`<div class="section-label"${overdue.length?' style="margin-top:16px;"':''}>Send</div>${send.map(row).join('')}`:'';
+  const nurtureHtml=nurture.length?`<div class="section-label" style="${(overdue.length||send.length)?'margin-top:16px;':''}color:var(--amber-text);">Nurture</div>${nurture.map(row).join('')}`:'';
+  const activeHtml=active.length?`<div class="section-label"${(overdue.length||send.length||nurture.length)?' style="margin-top:16px;"':''}>Active</div>${active.map(row).join('')}`:'';
+  return`<div style="padding:0 24px 16px;"><div style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px;color:var(--text);line-height:28px;">Network</div><div style="font-size:13px;color:var(--text-3);margin-top:2px;">${data.contacts.length} active · ${overdue.length} overdue</div></div><button style="background:var(--green-btn);color:white;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>Add</button></div></div>${batchQueueAlert()}<div style="padding:0 24px;">${focusSect}${overdueHtml}${sendHtml}${nurtureHtml}${activeHtml}</div>`;
 }
 let projFilter = 'all';
 const projExpanded = new Set();
@@ -1202,6 +1212,11 @@ async function fetchFromGitHub(dateStr) {
         data.focusToday = payload.focusToday || [];
       }
       data.batchQueue = batchQueue;
+      // Load persisted outreach drafts
+      try {
+        const dr = await fetch('/outreach-drafts.json');
+        if (dr.ok) { const drafts = await dr.json(); if (drafts) data.outreachDrafts = drafts; }
+      } catch {}
     } else {
       // No local server — try contacts-cache.json (static fallback)
       const tr = await fetch('daily/contacts-cache.json').catch(()=>null);
@@ -1422,6 +1437,7 @@ function showContactDetail(c) {
   if (!body || !sheet) return;
   const statusColors = { overdue: 'var(--red-text)', send: 'var(--mint-text)', active: 'var(--text-3)' };
   const statusLabels = { overdue: 'Overdue', send: 'Priority', active: 'Active' };
+  const existingDraft = (data.outreachDrafts && data.outreachDrafts[c.name]) ? data.outreachDrafts[c.name].draft : '';
   body.innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
       <div class="contact-avatar ${c.av}" style="width:48px;height:48px;font-size:16px;flex-shrink:0;">${c.initials}</div>
@@ -1432,10 +1448,20 @@ function showContactDetail(c) {
       <span style="font-size:12px;font-weight:600;color:${statusColors[c.status]||'var(--text-3)'};">${statusLabels[c.status]||''}</span>
     </div>
     ${c.lastTouch ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Last Touch</div><div style="font-size:14px;color:var(--text-2);line-height:1.5;">${c.lastTouch}</div></div>` : ''}
-    ${c.action ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Next Action</div><div style="font-size:14px;color:var(--text);line-height:1.5;">${c.action}</div></div>` : ''}
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Next Action</div>
+      <textarea id="cd-action" rows="2" style="width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);resize:none;font-family:inherit;">${c.action||''}</textarea>
+    </div>
     ${c.time ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Due</div><div style="font-size:14px;color:${c.status==='overdue'?'var(--red-text)':'var(--text-2)'};">${c.time}</div></div>` : ''}
-    ${c.notes ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Notes</div><div style="font-size:13px;color:var(--text-3);line-height:1.6;">${c.notes}</div></div>` : ''}
-    <div style="margin-top:6px;display:flex;flex-direction:column;gap:8px;">
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-4);margin-bottom:4px;">Notes</div>
+      <textarea id="cd-notes" rows="3" style="width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text);resize:none;font-family:inherit;">${c.notes||''}</textarea>
+    </div>
+    ${existingDraft ? `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--green);margin-bottom:4px;">Saved Draft</div><div style="font-size:13px;color:var(--text-2);line-height:1.5;background:var(--surface-2);border-radius:8px;padding:8px 10px;">${existingDraft}</div></div>` : ''}
+    <div style="margin-bottom:10px;">
+      <button class="action-btn action-btn-secondary" onclick="saveContactNote()" style="width:100%;">Save Notes / Next Action</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
       <div style="display:flex;gap:8px;">
         <button class="action-btn action-btn-primary" onclick="contactAction('draft')">Draft Message</button>
         <button class="action-btn action-btn-secondary" onclick="contactAction('touch')">Mark Touched</button>
@@ -1460,16 +1486,58 @@ function closeContactDetail() {
   if (overlay) { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 220); }
 }
 
+function saveDraftMsg(el, name, idx) {
+  const txt = el.innerText.trim();
+  if (!txt) return;
+  const item = data.outreach[idx];
+  if (item) { item.msg = txt; item.status = 'draft'; }
+  if (!data.outreachDrafts) data.outreachDrafts = {};
+  data.outreachDrafts[name] = { draft: txt };
+  if (isLocalServer) {
+    fetch('/api/draft-message', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, draft: txt }) }).catch(()=>{});
+  }
+}
+
+function saveContactNote() {
+  const c = _activeContact;
+  if (!c) return;
+  const actionEl = document.getElementById('cd-action');
+  const notesEl  = document.getElementById('cd-notes');
+  const newAction = actionEl ? actionEl.value.trim() : '';
+  const newNotes  = notesEl  ? notesEl.value.trim()  : '';
+  const contact = data.contacts.find(o => o.name === c.name);
+  if (contact) {
+    if (newAction) contact.action = newAction;
+    if (newNotes)  contact.notes  = newNotes;
+  }
+  if (isLocalServer) {
+    fetch('/api/contact/note', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name: c.name, action: newAction, note: newNotes }) }).catch(()=>{});
+  }
+  if (actionEl) actionEl.style.borderColor = 'var(--green)';
+  if (notesEl)  notesEl.style.borderColor  = 'var(--green)';
+  setTimeout(() => {
+    if (actionEl) actionEl.style.borderColor = '';
+    if (notesEl)  notesEl.style.borderColor  = '';
+  }, 1200);
+}
+
 function contactAction(type) {
   const c = _activeContact;
   if (!c) return;
+  const actionEl = document.getElementById('cd-action');
+  const notesEl  = document.getElementById('cd-notes');
+  if (actionEl || notesEl) saveContactNote();
   closeContactDetail();
   const now = new Date();
   const t = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
   if (type === 'draft') {
     const exists = data.outreach.find(o => o.name === c.name);
-    if (!exists) data.outreach.unshift({ ...c, msg: `Stone is drafting a message for ${c.name}...`, status: 'draft' });
+    const draftMsg = (data.outreachDrafts && data.outreachDrafts[c.name]) ? data.outreachDrafts[c.name].draft : `Stone is drafting a message for ${c.name}...`;
+    if (!exists) data.outreach.unshift({ ...c, msg: draftMsg, status: 'draft' });
+    else if (exists && exists.status === 'draft') exists.msg = draftMsg;
     manualMode = 'execute';
     render('home');
   } else if (type === 'touch') {

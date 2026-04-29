@@ -21,11 +21,15 @@ from pathlib import Path
 
 
 def _cat(path, binary=False):
-    """Read a file via /bin/cat — triggers iCloud download-on-demand unlike raw open()."""
+    """Read a file — tries /bin/cat first (triggers iCloud download-on-demand), falls back to direct open."""
     r = subprocess.run(["/bin/cat", str(path)], capture_output=True)
-    if r.returncode != 0:
+    if r.returncode == 0:
+        return r.stdout if binary else r.stdout.decode("utf-8")
+    # Fallback: direct read (works once Full Disk Access is granted to Python.app)
+    try:
+        return path.read_bytes() if binary else path.read_text(encoding="utf-8")
+    except Exception:
         raise PermissionError(f"cat failed (rc={r.returncode}): {r.stderr.decode()[:200]}")
-    return r.stdout if binary else r.stdout.decode("utf-8")
 
 BRAIN     = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/2-Areas/AI Second Brain"
 DASHBOARD = Path(__file__).parent
@@ -35,9 +39,22 @@ DAILY_DIR    = BRAIN / "Daily"
 CONTACTS_CACHE_ICLOUD = DAILY_DIR / "contacts-cache.json"
 CONTACTS_CACHE_LOCAL  = DASHBOARD / "contacts-cache.json"   # always accessible by launchd
 CONTACTS_CACHE = CONTACTS_CACHE_LOCAL                        # server reads local; Stone syncs from iCloud
+PENDING_WRITES = DASHBOARD / "pending-writes.json"           # queued writes when iCloud is inaccessible
 PROJECTS     = BRAIN / "1-Projects"
 CERT      = DASHBOARD / "cert.pem"
 KEY       = DASHBOARD / "key.pem"
+
+
+# ── Pending-writes queue (processed by Stone at next session) ─────────────────
+
+def queue_write(op: dict):
+    """Append an operation to pending-writes.json for Stone to process at next session."""
+    try:
+        existing = json.loads(PENDING_WRITES.read_text(encoding="utf-8")) if PENDING_WRITES.exists() else []
+        existing.append(op)
+        PENDING_WRITES.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 
 # ── SSL cert ──────────────────────────────────────────────────────────────────
@@ -112,7 +129,7 @@ def parse_contacts(max_rows=12):
                         c["av"] = "av-red"
                 except Exception:
                     pass
-        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
+        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "nurture": 2, "active": 3}.get(c["status"], 3))
         focus_names = {c.lower() for c in data.get("focusToday", [])}
         sliced = contacts[:max_rows]
         in_slice = {c["name"].lower() for c in sliced}
@@ -316,35 +333,43 @@ def write_mask_response(date_str, letter, response):
                 insert_at = i + 1
         lines.insert(insert_at, response_line)
 
-    note_path.write_text("".join(lines), encoding="utf-8")
-    return True
+    try:
+        note_path.write_text("".join(lines), encoding="utf-8")
+        return True
+    except Exception:
+        queue_write({"type": "mask", "date": date_str, "letter": letter, "response": response})
+        return False
 
 
 # ── 10x toggle ────────────────────────────────────────────────────────────────
 
 def toggle_tenx(date_str, row_index, done):
     note_path = DAILY_DIR / f"{date_str}.md"
-    if not note_path.exists():
+    try:
+        if not note_path.exists():
+            raise FileNotFoundError
+        lines = _cat(note_path).splitlines(keepends=True)
+        in_sec = False
+        rows_seen = 0
+        for i, line in enumerate(lines):
+            s = line.strip()
+            if re.match(r'^##\s+(Section 2|10x Items)', s, re.IGNORECASE):
+                in_sec = True
+                continue
+            if in_sec:
+                if s.startswith("##"):
+                    break
+                if re.match(r'^\|\s*(?:\d+|⚠️)', s):
+                    if rows_seen == row_index:
+                        new = re.sub(r'\[\s*\]', '[x]', line) if done else re.sub(r'\[x\]|\[X\]|✅', '[ ]', line)
+                        lines[i] = new
+                        note_path.write_text("".join(lines), encoding="utf-8")
+                        return True
+                    rows_seen += 1
         return False
-    lines = _cat(note_path).splitlines(keepends=True)
-    in_sec = False
-    rows_seen = 0
-    for i, line in enumerate(lines):
-        s = line.strip()
-        if re.match(r'^##\s+(Section 2|10x Items)', s, re.IGNORECASE):
-            in_sec = True
-            continue
-        if in_sec:
-            if s.startswith("##"):
-                break
-            if re.match(r'^\|\s*(?:\d+|⚠️)', s):
-                if rows_seen == row_index:
-                    new = re.sub(r'\[\s*\]', '[x]', line) if done else re.sub(r'\[x\]|\[X\]|✅', '[ ]', line)
-                    lines[i] = new
-                    note_path.write_text("".join(lines), encoding="utf-8")
-                    return True
-                rows_seen += 1
-    return False
+    except Exception:
+        queue_write({"type": "tenx", "date": date_str, "index": row_index, "done": done})
+        return False
 
 
 # ── Contact tracker write-back ────────────────────────────────────────────────
@@ -399,7 +424,7 @@ def update_contact_in_tracker(name, updates, clear_focus=False):
         if clear_focus:
             ft = data.get("focusToday", [])
             data["focusToday"] = [n for n in ft if clean(n) != target]
-        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "active": 2}.get(c["status"], 2))
+        contacts.sort(key=lambda c: {"overdue": 0, "send": 1, "nurture": 2, "active": 3}.get(c["status"], 3))
         data["contacts"] = contacts
         payload = json.dumps(data, ensure_ascii=False, indent=2)
         CONTACTS_CACHE_LOCAL.write_text(payload, encoding="utf-8")
@@ -443,33 +468,37 @@ def write_wrap_reflection(date_str, answers):
 
 def append_log(date_str, time_str, entry):
     note_path = DAILY_DIR / f"{date_str}.md"
-    if not note_path.exists():
-        return False
-    lines = _cat(note_path).splitlines(keepends=True)
     log_line = f"- {time_str} - {entry}\n" if time_str else f"- {entry}\n"
-    in_log = False
-    last_entry_idx = -1
-    log_section_idx = -1
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped == "## Log":
-            in_log = True
-            log_section_idx = i
-            continue
-        if in_log:
-            if stripped.startswith("## ") or stripped == "---":
-                break
-            if stripped.startswith("- "):
-                last_entry_idx = i
-    if last_entry_idx >= 0:
-        lines.insert(last_entry_idx + 1, log_line)
-    elif log_section_idx >= 0:
-        lines.insert(log_section_idx + 1, log_line)
-    else:
-        lines.append("\n## Log\n")
-        lines.append(log_line)
-    note_path.write_text("".join(lines), encoding="utf-8")
-    return True
+    try:
+        if not note_path.exists():
+            raise FileNotFoundError
+        lines = _cat(note_path).splitlines(keepends=True)
+        in_log = False
+        last_entry_idx = -1
+        log_section_idx = -1
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if re.match(r"##\s+Section 3|##\s+Log$", stripped):
+                in_log = True
+                log_section_idx = i
+                continue
+            if in_log:
+                if stripped.startswith("## ") or stripped == "---":
+                    break
+                if stripped.startswith("- "):
+                    last_entry_idx = i
+        if last_entry_idx >= 0:
+            lines.insert(last_entry_idx + 1, log_line)
+        elif log_section_idx >= 0:
+            lines.insert(log_section_idx + 1, log_line)
+        else:
+            lines.append("\n## Log\n")
+            lines.append(log_line)
+        note_path.write_text("".join(lines), encoding="utf-8")
+        return True
+    except Exception:
+        queue_write({"type": "log", "date": date_str, "time": time_str, "entry": entry})
+        return False
 
 
 # ── Request handler ───────────────────────────────────────────────────────────
@@ -507,6 +536,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/daily/contacts-cache.json":
             self.serve(CONTACTS_CACHE, "application/json")
 
+        elif path == "/outreach-drafts.json":
+            self.serve(DASHBOARD / "outreach-drafts.json", "application/json")
+
         elif path.startswith("/daily/"):
             fname = path[len("/daily/"):]
             if len(fname) == 13 and fname.endswith(".md") and fname[:4].isdigit():
@@ -530,6 +562,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.serve(PROJECTS / folder / "Status.md", "text/plain")
             else:
                 self.send_error(404)
+
+        elif path == "/api/pending-writes":
+            try:
+                ops = json.loads(PENDING_WRITES.read_text(encoding="utf-8")) if PENDING_WRITES.exists() else []
+                self._respond(200, "application/json", json.dumps(ops, ensure_ascii=False).encode())
+            except Exception:
+                self._respond(200, "application/json", b"[]")
 
         elif path == "/api/contacts":
             try:
@@ -650,6 +689,54 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "worked": body.get("worked", ""),
                     "better": body.get("better", ""),
                 })
+                self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/pending-writes/clear":
+            try:
+                PENDING_WRITES.write_text("[]", encoding="utf-8")
+                self._respond(200, "application/json", b'{"ok":true}')
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/draft-message":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                name   = body.get("name", "").strip()
+                draft  = body.get("draft", "").strip()
+                if not name:
+                    self.send_error(400); return
+                drafts_path = DASHBOARD / "outreach-drafts.json"
+                try:
+                    drafts = json.loads(drafts_path.read_text(encoding="utf-8")) if drafts_path.exists() else {}
+                except Exception:
+                    drafts = {}
+                if draft:
+                    drafts[name] = {"draft": draft, "saved": _dt.datetime.now().isoformat()}
+                else:
+                    drafts.pop(name, None)
+                drafts_path.write_text(json.dumps(drafts, ensure_ascii=False, indent=2), encoding="utf-8")
+                self._respond(200, "application/json", b'{"ok":true}')
+            except Exception as e:
+                self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
+
+        elif path == "/api/contact/note":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body   = json.loads(self.rfile.read(length))
+                name   = body.get("name", "").strip()
+                note   = body.get("note", "").strip()
+                action = body.get("action", "").strip()
+                if not name:
+                    self.send_error(400); return
+                updates = {}
+                if note:
+                    updates["notes"] = note
+                if action:
+                    updates["next_action"] = action
+                ok = update_contact_in_tracker(name, updates) if updates else True
                 self._respond(200, "application/json", json.dumps({"ok": ok}).encode())
             except Exception as e:
                 self._respond(500, "application/json", json.dumps({"error": str(e)}).encode())
