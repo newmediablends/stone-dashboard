@@ -321,11 +321,77 @@
     .action-btn-primary { background: var(--green-btn); color: #fff; }
     .action-btn-secondary { background: var(--bg-surface); color: var(--text); border: 1px solid var(--border) !important; }
     .action-btn-ghost { background: var(--bg-surface); color: var(--text-3); border: 1px solid var(--border) !important; font-weight: 500; }
+
+    /* ---- SIDEBAR (tablet/desktop) ---- */
+    #sidebar { display: none; }
+    #main-col { display: contents; } /* transparent wrapper on mobile */
+
+    @media (min-width: 768px) {
+      body { overflow: hidden; }
+      #app { flex-direction: row; max-width: none; margin: 0; height: 100vh; border-radius: 0; box-shadow: none; }
+      #sidebar { display: flex !important; flex-direction: column; width: 220px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--bg-card); padding: 32px 16px 24px; height: 100vh; overflow-y: auto; }
+      #main-col { display: flex; flex-direction: column; flex: 1; min-width: 0; height: 100vh; position: relative; overflow: hidden; }
+      .header { display: none; }
+      .status-bar { display: none; }
+      #tab-bar { display: none !important; }
+      .content { flex: 1; padding-bottom: 0; }
+      .mic-bar { position: relative; bottom: auto; left: auto; right: auto; flex-shrink: 0; padding-bottom: 16px; }
+
+      /* Sidebar elements */
+      .sb-logo { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; padding: 0 8px 28px; display: block; }
+      #sb-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+      .sb-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-3); border: none; background: none; width: 100%; text-align: left; transition: background 0.15s, color 0.15s; font-family: 'DM Sans', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+      .sb-item svg { flex-shrink: 0; opacity: 0.65; transition: opacity 0.15s; }
+      .sb-item.active { background: var(--bg-surface); color: var(--text); font-weight: 600; }
+      .sb-item.active svg { opacity: 1; }
+      .sb-item:not(.active):hover { background: var(--bg-surface); color: var(--text-2); }
+      .sb-footer { display: flex; align-items: center; gap: 10px; padding: 20px 4px 0; }
+
+      /* Projects 2-col grid */
+      .proj-cards-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+    }
+
+    @media (min-width: 1280px) {
+      #sidebar { width: 260px; }
+      .proj-cards-wrap { grid-template-columns: 1fr 1fr 1fr; }
+    }
   </style>
   <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </head>
 <body>
 <div id="app">
+  <!-- SIDEBAR — hidden on mobile, shown at 768px+ -->
+  <div id="sidebar">
+    <span class="sb-logo">Stone</span>
+    <nav id="sb-nav">
+      <button class="sb-item active" data-tab="home" onclick="render('home')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Home
+      </button>
+      <button class="sb-item" data-tab="day" onclick="render('day')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Day
+      </button>
+      <button class="sb-item" data-tab="people" onclick="render('people')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        People
+      </button>
+      <button class="sb-item" data-tab="projects" onclick="render('projects')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Projects
+      </button>
+    </nav>
+    <div class="sb-footer">
+      <button class="theme-btn" id="theme-btn-sb" title="Toggle dark mode">
+        <svg id="theme-icon-sb" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <div class="avatar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="white" stroke-width="2"/></svg>
+      </div>
+    </div>
+  </div>
+  <!-- MAIN COLUMN -->
+  <div id="main-col">
   <div class="status-bar"></div>
   <div class="header">
     <span class="wordmark">Stone</span>
@@ -379,6 +445,7 @@
       </button>
     </div>
   </div>
+  </div><!-- end #main-col -->
 </div>
 
 <script>
@@ -390,13 +457,17 @@ function applyTheme(t) {
   theme = t;
   html.dataset.theme = t;
   localStorage.setItem('theme', t);
-  const icon = document.getElementById('theme-icon');
-  icon.innerHTML = t === 'dark'
+  const sunMoon = t === 'dark'
     ? '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
     : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.innerHTML = sunMoon;
+  const iconSb = document.getElementById('theme-icon-sb');
+  if (iconSb) iconSb.innerHTML = sunMoon;
 }
 applyTheme(theme);
 document.getElementById('theme-btn').addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+document.getElementById('theme-btn-sb').addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
 
 /* ---- INDEXED DB ---- */
 function openDB() {
@@ -1041,8 +1112,8 @@ function renderProjects() {
     + '<div style="font-size:13px;color:var(--text-3);margin-top:2px;">' + activeCount + ' active · ' + blockedCount + ' blocked' + attnNote + '</div>'
     + '</div>'
     + '<div style="padding:0 24px 16px;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">' + filterPills + '</div>'
-    + '<div style="padding:0 24px;">'
-    + (cards || '<div style="font-size:14px;color:var(--text-4);padding:8px 0;">No projects match this filter.</div>')
+    + '<div class="proj-cards-wrap">'
+    + (cards || '<div style="font-size:14px;color:var(--text-4);padding:8px 0;grid-column:1/-1;">No projects match this filter.</div>')
     + '</div>';
 }
 
@@ -1086,6 +1157,7 @@ let countdownTimer = null;
 function render(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-pill').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   clearInterval(countdownTimer);
   let html='';
   if (tab==='home') {
