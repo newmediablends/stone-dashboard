@@ -2,54 +2,81 @@
 
 Mobile web dashboard — a visual layer on top of the Second Brain. No new systems. Reads existing markdown files, surfaces the day in one view.
 
-**Live:** https://newmediablends.github.io/stone-dashboard/
+**Live (anywhere):** https://newmediablends.github.io/stone-dashboard/
+**Live (local, full read/write):** https://192.168.68.91:3000
 
 ---
 
 ## What it does
 
-- Auto-detects energy mode by time (Prime / Peak / Rebuild / Execute / Wrap) and switches the Home view accordingly
+- Auto-detects energy mode by time (Prime / Peak / Rebuild / Execute / Wrap)
 - Four tabs: Home, Day, People, Projects
-- Narration input — type or speak to log entries (Web Speech API, no cost)
-- Runs entirely in the browser. No server, no API calls, no subscriptions.
+- Narration input — type or speak to log entries (writes back to iCloud markdown)
+- 10x checkboxes — tap to mark done, writes back to daily note
+- MASK journal — tap to answer, saves to markdown
+- Auto-refreshes every 60 seconds when on local server
+- Installable as PWA (Add to Home Screen on iPhone)
 
-## Phases
+## Auto-start setup (one-time)
 
-| Phase | What | Status |
-|---|---|---|
-| 1 | Shell + design + energy modes + sample data | Done |
-| 2 | File System Access — reads actual markdown files | Next |
-| 3 | Real data rendering (daily note, network tracker, projects) | Upcoming |
-| 4 | Narration writes back to daily note log | Upcoming |
-| 5 | PWA manifest — full home screen app | Upcoming |
+The server starts automatically at login via `~/Applications/StoneServer.app` (Login Item).
 
-## Design reference
+To verify it's set up:
+- System Settings → General → Login Items → should see "StoneServer"
 
-Paper file: **"Plan My Day - Dashboard UI"**
-- v0 — original scrolling list
-- v1 — native app with bottom nav (reference for future)
-- v2 — mobile web with pill tabs (current build spec)
+To start it manually now:
+```bash
+open ~/Applications/StoneServer.app
+```
+
+To start with Cloudflare tunnel (anywhere access):
+```bash
+cd ~/stone-dashboard && ./tunnel.sh
+```
+
+## What's running where
+
+| Context | URL | Writes? |
+|---------|-----|---------|
+| Local WiFi (auto-start) | https://[your-ip]:3000 | Yes |
+| Cloudflare tunnel | tunnel URL | Yes |
+| GitHub Pages (anywhere, synced) | newmediablends.github.io/stone-dashboard | No |
+
+## On iPhone — install as PWA
+
+**Local (recommended):**
+1. On same WiFi: open Safari → `https://192.168.68.91:3000`
+2. Share → Add to Home Screen → name it **Stone**
+3. Full-screen, writes back to your markdown
+
+**Anywhere (GitHub Pages snapshot):**
+1. Open Safari → `newmediablends.github.io/stone-dashboard`
+2. Share → Add to Home Screen → name it **Stone**
+3. Read-only, shows last synced data
+
+## Syncing to GitHub Pages
+
+```bash
+cd ~/stone-dashboard && ./sync.sh
+```
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `index.html` | Full dashboard app |
+| `server.py` | Local HTTPS server (reads + writes iCloud) |
+| `sw.js` | Service worker (offline support, PWA cache) |
+| `manifest.json` | PWA manifest (install prompt, icons) |
+| `icon-180.png` / `icon-512.png` | Home screen icons |
+| `start.sh` | Start server + optional Cloudflare tunnel |
+| `StoneServer.app` | Login Item (auto-start at login, full iCloud access) |
+| `sync.sh` | Push markdown files to GitHub Pages |
+| `tunnel.sh` | Cloudflare quick tunnel — anywhere access |
+| `cert.pem` | SSL cert — AirDrop to iPhone once to enable voice |
+
+**Repo:** github.com/newmediablends/stone-dashboard
 
 ## Core constraint
 
 This app is a visual layer only. It does not create or modify any Stone protocol, CLAUDE.md rule, PARA convention, or Plan My Day step. The system does not adapt to the app — the app adapts to the system.
-
-## Updating
-
-After editing `dashboard.html` in the Second Brain project folder:
-
-```bash
-cp "/path/to/AI Second Brain/1-Projects/Second Brain Dashboard — Mobile UI/dashboard.html" ~/stone-dashboard/index.html
-cd ~/stone-dashboard
-git add index.html
-git commit -m "describe what changed"
-git push
-```
-
-GitHub Pages redeploys in ~60 seconds.
-
-## On iPhone
-
-1. Open Safari → `newmediablends.github.io/stone-dashboard`
-2. Share → Add to Home Screen → name it **Stone**
-3. Opens full screen, no browser chrome
