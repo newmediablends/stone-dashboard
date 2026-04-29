@@ -565,15 +565,17 @@ function section(md, ...headings) {
 function parseDailyNote(md) {
   const out = {};
 
-  // Faith anchor — labeled format OR bare blockquote at top of doc
-  const labeled = md.match(/\*\*Faith anchor:\*\*[\s\S]*?>\s*"?([^"\n]+)"?/);
+  // Faith anchor — inline labeled format first, then bare blockquote fallback
+  const labeled = md.match(/\*\*Faith anchor:\*\*\s*(.+)/);
   const bare    = md.match(/^>\s*"?([^"\n]+)"?\s*—/m);
   const raw     = labeled || bare;
   if (raw) out.faithAnchor = '"' + raw[1].trim().replace(/^"|"$/g,'') + '"';
 
   // Schedule — handles ## Section 1 or ## Schedule
+  // Note: [^|\n] (no hyphen exclusion) lets the |---|---| divider row match, so .slice(2)
+  // correctly skips header + divider. Rows with hyphens in cells (phone numbers etc.) now parse.
   const sec1 = section(md, 'Section 1[^#\n]*', 'Schedule');
-  const schedRows = [...sec1.matchAll(/\|\s*([^|\n\-]{2,}?)\s*\|\s*([^|\n\-]{2,}?)\s*\|\s*([^|\n\-]{2,}?)\s*\|/g)].slice(2);
+  const schedRows = [...sec1.matchAll(/\|\s*([^|\n]{2,}?)\s*\|\s*([^|\n]{2,}?)\s*\|\s*([^|\n]{2,}?)\s*\|/g)].slice(2);
   if (schedRows.length) {
     out.schedule = schedRows.map(r => ({
       time:  r[1].trim(),
