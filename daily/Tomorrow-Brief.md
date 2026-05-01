@@ -13,7 +13,7 @@
 ## Stone's Queue
 
 - Loop with President Loosli → 2-Areas/Church
-- Benetrends Annual Census → review before May 4
+- Benetrends Census walk-through — Brittany call booked Tue 05-05 1 PM MDT
 - Insurance options → Owner's Inbox
 - KAIROS narrative for job search
 
