@@ -225,7 +225,7 @@ def parse_home_data(date_str):
         # Section marker: accept either `## End-of-Day Reflection` heading or `**End-of-Day Reflection**` bold inline.
         # Answer position: accept either same-line (`1. **Q?** answer`) or next-line.
         refl_m = re.search(
-            r"(?:^##\s+End-of-Day Reflection|\*\*End-of-Day Reflection\*\*)[^\n]*\n([\s\S]+?)(?=\n---|\n##|\Z)",
+            r"(?:^##\s+End-of-Day Reflection|^\*\*End-of-Day Reflection\*\*)[^\n]*\n([\s\S]+?)(?=\n---|\n##|\Z)",
             txt, re.MULTILINE,
         )
         if refl_m:
@@ -263,7 +263,8 @@ def parse_home_data(date_str):
             tb = ""
         loops_m = re.search(r"##\s+Open Loops[^\n]*\n([\s\S]+?)(?=\n##|\Z)", tb)
         if loops_m:
-            items = re.findall(r"^-\s+(.+)$", loops_m.group(1), re.MULTILINE)
+            # Accept either bulleted (- item) or numbered (1. item) lists; wrap.md doesn't enforce a format.
+            items = re.findall(r"^(?:-|\d+\.)\s+(.+)$", loops_m.group(1), re.MULTILINE)
             tomorrow_items = [i.strip().strip("*").strip() for i in items if i.strip()][:3]
 
     if not tomorrow_items and txt:

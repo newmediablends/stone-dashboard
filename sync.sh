@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-BRAIN="/Users/mikebairdm4mini/Library/Mobile Documents/com~apple~CloudDocs/2-Areas/AI Second Brain"
+BRAIN="/Users/mikebairdm4mini/Library/Mobile Documents/iCloud~md~obsidian/Documents/AI Second Brain"
 REPO="$(cd "$(dirname "$0")" && pwd)"
 DAILY_OUT="$REPO/daily"
 
@@ -23,6 +23,13 @@ while IFS= read -r -d '' f; do
   fi
 done < <(find "$BRAIN/Daily" -name "*.md" -print0 2>/dev/null)
 echo "  $COUNT daily notes synced"
+
+# ---- Tomorrow-Brief.md (used by dashboard for Tomorrow's Top 3) ----
+TBRIEF="$BRAIN/Daily/Tomorrow-Brief.md"
+if [ -f "$TBRIEF" ]; then
+  cp "$TBRIEF" "$DAILY_OUT/Tomorrow-Brief.md"
+  echo "  Tomorrow-Brief.md synced"
+fi
 
 # ---- Contacts cache (Notion-backed) ----
 CONTACTS_CACHE="$BRAIN/Daily/contacts-cache.json"
