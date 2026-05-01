@@ -265,7 +265,7 @@ def parse_home_data(date_str):
         if loops_m:
             # Accept either bulleted (- item) or numbered (1. item) lists; wrap.md doesn't enforce a format.
             items = re.findall(r"^(?:-|\d+\.)\s+(.+)$", loops_m.group(1), re.MULTILINE)
-            tomorrow_items = [i.strip().strip("*").strip() for i in items if i.strip()][:3]
+            tomorrow_items = [re.sub(r"\*\*", "", i).strip() for i in items if i.strip()][:3]
 
     if not tomorrow_items and txt:
         sec2_m = re.search(r"##\s+Section 2[^\n]*\n([\s\S]+?)(?=\n##|\Z)", txt)
