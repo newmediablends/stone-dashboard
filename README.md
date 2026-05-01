@@ -36,18 +36,26 @@ cd ~/stone-dashboard && ./tunnel.sh
 
 ## What's running where
 
-| Context | URL | Writes? |
-|---------|-----|---------|
-| Local WiFi (auto-start) | https://[your-ip]:3000 | Yes |
-| Cloudflare tunnel | tunnel URL | Yes |
-| GitHub Pages (anywhere, synced) | newmediablends.github.io/stone-dashboard | No |
+| Context | URL | Writes? | Notes |
+|---------|-----|---------|-------|
+| Local WiFi — HTTP (recommended for iPhone) | http://[your-ip]:3001 | Yes | No voice narration |
+| Local WiFi — HTTPS | https://[your-ip]:3000 | Yes | Cert must be trusted on device |
+| Cloudflare tunnel | tunnel URL | Yes | Anywhere access |
+| GitHub Pages (anywhere, synced) | newmediablends.github.io/stone-dashboard | No | Read-only snapshot |
 
 ## On iPhone — install as PWA
 
-**Local (recommended):**
-1. On same WiFi: open Safari → `https://192.168.68.91:3000`
+**Local — HTTP (recommended, no cert setup):**
+1. On same WiFi: open Safari → `http://192.168.68.91:3001`
 2. Share → Add to Home Screen → name it **Stone**
-3. Full-screen, writes back to your markdown
+3. Full read/write. No voice narration on the mic button (Web Speech requires HTTPS).
+
+**Local — HTTPS (only if you want iPhone voice narration):**
+1. AirDrop `~/stone-dashboard/cert.pem` to the iPhone
+2. iPhone: Settings → General → VPN & Device Management → install the profile
+3. Settings → General → About → Certificate Trust Settings → enable full trust for the cert
+4. Open Safari → `https://192.168.68.91:3000` → Share → Add to Home Screen
+5. Skipping the trust step gives you a blank screen in standalone PWA mode (no UI to bypass cert warning).
 
 **Anywhere (GitHub Pages snapshot):**
 1. Open Safari → `newmediablends.github.io/stone-dashboard`
