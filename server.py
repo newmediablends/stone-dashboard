@@ -31,7 +31,7 @@ def _cat(path, binary=False):
     except Exception:
         raise PermissionError(f"cat failed (rc={r.returncode}): {r.stderr.decode()[:200]}")
 
-BRAIN     = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/2-Areas/AI Second Brain"
+BRAIN     = Path.home() / "Library/Mobile Documents/iCloud~md~obsidian/Documents/AI Second Brain"
 DASHBOARD = Path(__file__).parent
 PORT      = 3000
 
@@ -143,8 +143,13 @@ def parse_contacts(max_rows=12):
 # ── Home data (Day Score, reflection, tomorrow) ───────────────────────────────
 
 def parse_home_data(date_str):
-    note_path  = DAILY_DIR / f"{date_str}.md"
-    brief_path = DAILY_DIR / "Tomorrow-Brief.md"
+    # Match write-side path resolution: prefer local mirror (always readable by launchd),
+    # fall back to iCloud DAILY_DIR. Without this, launchd-spawned servers see empty
+    # iCloud paths and return blank reflections even when the file exists locally.
+    local_note  = DAILY_LOCAL / f"{date_str}.md"
+    note_path   = local_note if local_note.exists() else DAILY_DIR / f"{date_str}.md"
+    local_brief = DAILY_LOCAL / "Tomorrow-Brief.md"
+    brief_path  = local_brief if local_brief.exists() else DAILY_DIR / "Tomorrow-Brief.md"
 
     tenx_done = 0
     tenx_total = 0
@@ -217,18 +222,33 @@ def parse_home_data(date_str):
                     break
 
         # ── End-of-Day Reflection ──────────────────────────────────────────────
-        refl_m = re.search(r"\*\*End-of-Day Reflection\*\*[^\n]*\n([\s\S]+?)(?=\n---|\n##|\Z)", txt)
+        # Section marker: accept either `## End-of-Day Reflection` heading or `**End-of-Day Reflection**` bold inline.
+        # Answer position: accept either same-line (`1. **Q?** answer`) or next-line.
+        refl_m = re.search(
+            r"(?:^##\s+End-of-Day Reflection|\*\*End-of-Day Reflection\*\*)[^\n]*\n([\s\S]+?)(?=\n---|\n##|\Z)",
+            txt, re.MULTILINE,
+        )
         if refl_m:
             refl = refl_m.group(1)
-            q1 = re.search(r"1\.\s*What got done\?[^\n]*\n([^\n]{10,})", refl)
-            q2 = re.search(r"2\.\s*What didn[^\n]*\?[^\n]*\n([^\n]{10,})", refl)
-            q4 = re.search(r"4\.\s*What would make tomorrow better\?[^\n]*\n([^\n]{10,})", refl)
-            if q1 and not q1.group(1).strip().startswith(("2.", "3.", "4.")):
-                win = q1.group(1).strip()
-            if q2 and not q2.group(1).strip().startswith(("3.", "4.")):
-                gap = q2.group(1).strip()
-            if q4 and not q4.group(1).strip().startswith("-"):
-                next_up = q4.group(1).strip()
+            # Each pattern allows: optional **bold** wrapper around the question, then either
+            # the answer on the same line after the question, or on the next line.
+            q1 = re.search(r"1\.\s*\*{0,2}What got done\?\*{0,2}\s*(.{10,}?)(?=\n\d\.|\n\n|\Z)", refl, re.DOTALL)
+            q2 = re.search(r"2\.\s*\*{0,2}What didn[^\n*]*\?\*{0,2}\s*(.{10,}?)(?=\n\d\.|\n\n|\Z)", refl, re.DOTALL)
+            q4 = re.search(r"4\.\s*\*{0,2}What would make tomorrow better\?\*{0,2}\s*(.{10,}?)(?=\n\d\.|\n\n|\Z)", refl, re.DOTALL)
+            def _clean(s):
+                return re.sub(r"\s+", " ", s).strip()
+            if q1:
+                ans = _clean(q1.group(1))
+                if ans and not ans.startswith(("2.", "3.", "4.")):
+                    win = ans
+            if q2:
+                ans = _clean(q2.group(1))
+                if ans and not ans.startswith(("3.", "4.")):
+                    gap = ans
+            if q4:
+                ans = _clean(q4.group(1))
+                if ans and not ans.startswith("-"):
+                    next_up = ans
 
     # ── Score: 70% 10x + 30% log density ──────────────────────────────────────
     score = round((tenx_done / tenx_total) * 70) if tenx_total else 0
